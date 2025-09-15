@@ -1,0 +1,13 @@
+# Python cache
+__pycache__/
+*.pyc
+
+# Virtual environments
+venv/
+
+# Databases
+*.db
+
+# OS/editor files
+.DS_Store
+*.swp
