@@ -5,7 +5,7 @@ import (
 	"html/template"
 	"log"
 	"net/http"
-
+	"os"
 	"github.com/gorilla/mux"
 	_ "modernc.org/sqlite"
 )
@@ -32,8 +32,18 @@ func parseTmpl() (*template.Template, error) {
 }
 
 func main() {
-	// Kør fra mappen: ...\DevOps-Valgfag\rewrite
-	db, err := sql.Open("sqlite", "../whoknows.db")
+ 	port := os.Getenv("PORT")
+ 	if port == "" {
+ 		port = "8080"
+ 	}
+ 	dbPath := os.Getenv("DATABASE_PATH")
+ 	if dbPath == "" {
+ 		dbPath = "../whoknows.db"
+ 	}
+ 
+ 	db, err := sql.Open("sqlite", dbPath)
+	
+	
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -62,7 +72,7 @@ func main() {
 		results := make([]Result, 0)
 		if q != "" {
 			rows, err := db.Query(`
-				SELECT title, description, url
+				SELECT title, content AS description, url
 				FROM pages
 				WHERE language = ? AND content LIKE ?
 			`, language, "%"+q+"%")
@@ -97,9 +107,8 @@ func main() {
 			return
 		}
 	}).Methods("GET")
-
-	addr := ":8080"
-	log.Printf("Server kører på http://localhost%s", addr)
-	log.Fatal(http.ListenAndServe(addr, r))
-
+  	log.Printf("Server kører på :%s", port)
+ 	log.Printf("DB path: %s", dbPath)
+ 	log.Fatal(http.ListenAndServe(":"+port, r))
+ 
 }
