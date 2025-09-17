@@ -1,10 +1,12 @@
 .PHONY: init run test
 
+PYTHON = backend/venv/bin/python
+
 init:
-	PYTHONPATH=backend python3 -c "from app import init_db; init_db()"
+	PYTHONPATH=backend $(PYTHON) -c "from app import init_db; init_db()"
 
 run:
-	python3 ./backend/app.py
+	$(PYTHON) backend/app.py
 
-test: 
-	PYTHONPATH=backend python3 ./backend/app_tests.py
+test:
+	PYTHONPATH=backend $(PYTHON) backend/app_tests.py
