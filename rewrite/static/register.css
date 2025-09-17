@@ -1,0 +1,19 @@
+/* Register page specific styles */
+form {
+  display: grid;
+  gap: 12px;
+  max-width: 320px;
+}
+
+input {
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+}
+
+input[type="submit"] {
+  background: #1f6feb;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+}

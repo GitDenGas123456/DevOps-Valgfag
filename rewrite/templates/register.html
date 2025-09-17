@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Register</title>
+  <link rel="stylesheet" href="/static/css/register.css">
+</head>
+<body>
+  <h2>Sign Up</h2>
+
+  {{ if .Error }}
+    <div class="error"><strong>Error:</strong> {{ .Error }}</div>
+  {{ end }}
+
+  {{ if .Ok }}
+    <div class="ok">{{ .Ok }}</div>
+  {{ end }}
+
+  <form action="/register" method="POST">
+    <dl>
+      <dt>Username:</dt>
+      <dd><input type="text" name="name" value="{{ .Form.Name }}"></dd>
+
+      <dt>E-Mail:</dt>
+      <dd><input type="email" name="email" value="{{ .Form.Email }}"></dd>
+
+      <dt>Password:</dt>
+      <dd><input type="password" name="password"></dd>
+
+      <dt>Password <small>(repeat)</small>:</dt>
+      <dd><input type="password" name="password2"></dd>
+    </dl>
+    <div class="actions"><input type="submit" value="Sign Up"></div>
+  </form>
+</body>
+</html>

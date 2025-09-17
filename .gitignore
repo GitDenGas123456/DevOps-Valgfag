@@ -1,4 +1,4 @@
-# Python cache
+git# Python cache
 __pycache__/
 *.pyc
 
@@ -11,3 +11,4 @@ venv/
 # OS/editor files
 .DS_Store
 *.swp
+
