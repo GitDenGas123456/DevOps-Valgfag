@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+
 	"github.com/gorilla/mux"
 	_ "modernc.org/sqlite"
 )
@@ -19,69 +20,74 @@ type Result struct {
 type PageData struct {
 	Query   string
 	Results []Result
-	// valgfrit:
-	User    *struct{ Username string }
-	Flashes []string
 }
 
-func parseTmpl() (*template.Template, error) {
-	return template.ParseFiles(
-		"templates/layout.html",
-		"templates/search.html",
+var tmpl *template.Template
+
+func loadTemplates() {
+	var err error
+	tmpl, err = template.ParseFiles(
+		"rewrite/templates/layout.html",
+		"rewrite/templates/search.html",
+		"rewrite/templates/about.html",
 	)
+	if err != nil {
+		log.Fatalf("template load error: %v", err)
+	}
 }
 
 func main() {
- 	port := os.Getenv("PORT")
- 	if port == "" {
- 		port = "8080"
- 	}
- 	dbPath := os.Getenv("DATABASE_PATH")
- 	if dbPath == "" {
- 		dbPath = "../whoknows.db"
- 	}
- 
- 	db, err := sql.Open("sqlite", dbPath)
-	
-	
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	dbPath := os.Getenv("DATABASE_PATH")
+	if dbPath == "" {
+		dbPath = "../whoknows.db"
+	}
+
+	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer db.Close()
 
+	loadTemplates()
+
 	r := mux.NewRouter()
 
-	// /static/*
-	fs := http.FileServer(http.Dir("static"))
-	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", fs))
+	// statiske filer
+	r.PathPrefix("/static/").Handler(
+		http.StripPrefix("/static/", http.FileServer(http.Dir("src/backend/static"))),
+	)
 
+	// about (bruger samme layout + body-block)
+	r.HandleFunc("/about", func(w http.ResponseWriter, r *http.Request) {
+		if err := tmpl.ExecuteTemplate(w, "layout", nil); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	}).Methods("GET")
+
+	// search /
 	r.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		// Parse templates på hver request, så du altid ser dine seneste ændringer
-		tmpl, err := parseTmpl()
-		if err != nil {
-			http.Error(w, "template parse error: "+err.Error(), http.StatusInternalServerError)
-			return
-		}
-
 		q := r.URL.Query().Get("q")
-		language := r.URL.Query().Get("language")
-		if language == "" {
-			language = "en"
+		lang := r.URL.Query().Get("language")
+		if lang == "" {
+			lang = "en"
 		}
 
-		results := make([]Result, 0)
+		results := []Result{}
 		if q != "" {
 			rows, err := db.Query(`
-				SELECT title, content AS description, url
-				FROM pages
-				WHERE language = ? AND content LIKE ?
-			`, language, "%"+q+"%")
+                SELECT title, content AS description, url
+                FROM pages
+                WHERE language = ? AND content LIKE ?
+            `, lang, "%"+q+"%")
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
 			defer rows.Close()
-
 			for rows.Next() {
 				var it Result
 				if err := rows.Scan(&it.Title, &it.Description, &it.URL); err != nil {
@@ -96,47 +102,14 @@ func main() {
 			}
 		}
 
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		if err := tmpl.ExecuteTemplate(w, "layout", PageData{
 			Query:   q,
 			Results: results,
-			// User:    &struct{ Username string }{"demo"},
-			// Flashes: []string{"Welcome back"},
 		}); err != nil {
-			http.Error(w, "template exec error: "+err.Error(), http.StatusInternalServerError)
-			return
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 	}).Methods("GET")
-  	log.Printf("Server kører på :%s", port)
- 	log.Printf("DB path: %s", dbPath)
- 	log.Fatal(http.ListenAndServe(":"+port, r))
- 
-}package main
 
-import (
-	"html/template"
-	"log"
-	"net/http"
-
-	"github.com/gorilla/mux"
-)
-
-func main() {
-	r := mux.NewRouter()
-
-	// Serve static files
-	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("src/backend/static"))))
-
-	// Routes
-	r.HandleFunc("/about", AboutHandler)
-
-	log.Println("Server running on http://localhost:8080")
-	log.Fatal(http.ListenAndServe(":8080", r))
-}
-
-func AboutHandler(w http.ResponseWriter, r *http.Request) {
-	tmpl := template.Must(template.ParseFiles("rewrite/templates/about.html"))
-	if err := tmpl.Execute(w, nil); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
+	log.Printf("Server kører på http://localhost:%s", port)
+	log.Fatal(http.ListenAndServe(":"+port, r))
 }
