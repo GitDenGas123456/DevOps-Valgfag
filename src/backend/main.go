@@ -2,7 +2,6 @@ package main
 
 import (
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"html/template"
 	"log"
@@ -12,72 +11,144 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/gorilla/sessions"
 	"golang.org/x/crypto/bcrypt"
-
 )
 
 var (
-	db *sql.DB
-	tmpl *template.Template
+	db           *sql.DB
+	tmpl         *template.Template
 	sessionStore = sessions.NewCookieStore([]byte("development key"))
-
 )
 
-
-//Structure used to make and asses login
+// --- Models ---
 type User struct {
-	ID         int
-	Username   string
-	Email      string
-	Password   string
-
+	ID       int
+	Username string
+	Email    string
+	Password string
 }
 
-// INSERT
 type Page struct {
-	ID         int
-	Language   string
-	Content    string
-
+	ID       int
+	Language string
+	Content  string
 }
 
+// --- Main ---
 func main() {
 	var err error
-	db, err = sql.Open("sqlite3", "../whoknows.db")
-	if err !=nil {
+	db, err = sql.Open("sqlite3", "./whoknows.db")
+	if err != nil {
 		log.Fatal(err)
 	}
 	defer db.Close()
 
+	// Parse templates including layout
 	tmpl = template.Must(template.ParseGlob("templates/*.html"))
 
 	r := mux.NewRouter()
 
-	//Routes for pages
+	// Static files
+	fs := http.FileServer(http.Dir("./static"))
+	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", fs))
+
+	// Page routes
 	r.HandleFunc("/", searchHandler).Methods("GET")
 	r.HandleFunc("/about", aboutHandler).Methods("GET")
 	r.HandleFunc("/login", loginHandler).Methods("GET")
 	r.HandleFunc("/register", registerHandler).Methods("GET")
+
+	// API routes
 	r.HandleFunc("/api/login", apiLoginHandler).Methods("POST")
 	r.HandleFunc("/api/register", apiRegisterHandler).Methods("POST")
 	r.HandleFunc("/api/logout", apiLogoutHandler).Methods("POST")
 	r.HandleFunc("/api/search", apiSearchHandler).Methods("POST")
 
 	fmt.Println("Server running on :8080")
-	http.ListenAndServe(":8080", r)
-
+	err = http.ListenAndServe(":8080", r)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
-//Handlers 
+// --- Template Helper ---
+func renderTemplate(w http.ResponseWriter, r *http.Request, tmplName string, data map[string]interface{}) {
+	if data == nil {
+		data = map[string]interface{}{}
+	}
+
+	// Add logged-in user if present
+	sess, _ := sessionStore.Get(r, "session")
+	if userID, ok := sess.Values["user_id"].(int); ok {
+		user := User{}
+		err := db.QueryRow("SELECT id, username, email FROM users WHERE id=?", userID).
+			Scan(&user.ID, &user.Username, &user.Email)
+		if err == nil {
+			data["User"] = user
+		}
+	}
+
+	// Execute layout template with child blocks
+	err := tmpl.ExecuteTemplate(w, "layout.html", data)
+	if err != nil {
+		log.Printf("Template %s error: %v", tmplName, err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+// --- Page Handlers ---
+func loginHandler(w http.ResponseWriter, r *http.Request) {
+    renderTemplate(w, r, "layout.html", map[string]interface{}{
+        "Page": "login",  // must match layout.html check
+    })
+}
+
+func registerHandler(w http.ResponseWriter, r *http.Request) {
+    renderTemplate(w, r, "layout.html", map[string]interface{}{
+        "Page": "register",  // must match layout.html check
+    })
+}
+
+func aboutHandler(w http.ResponseWriter, r *http.Request) {
+    renderTemplate(w, r, "layout.html", map[string]interface{}{
+        "Page": "about",  // must match layout.html check
+    })
+}
+
 func searchHandler(w http.ResponseWriter, r *http.Request) {
-	q := r.URL.Query().Get("q")
-	language := r.URL.Query().Get("language")
+    q := r.URL.Query().Get("q")
+    results := []Page{}
+    if q != "" {
+        rows, _ := db.Query("SELECT id, language, content FROM pages WHERE content LIKE ?", "%"+q+"%")
+        defer rows.Close()
+        for rows.Next() {
+            var p Page
+            rows.Scan(&p.ID, &p.Language, &p.Content)
+            results = append(results, p)
+        }
+    }
+
+    renderTemplate(w, r, "layout.html", map[string]interface{}{
+        "Page": "search",  // must match layout.html check
+        "Query": q,
+        "SearchResults": results,
+    })
+}
+
+// --- API Handlers ---
+func apiSearchHandler(w http.ResponseWriter, r *http.Request) {
+	r.ParseForm()
+	q := r.FormValue("q")
+	language := r.FormValue("language")
 	if language == "" {
 		language = "en"
 	}
+
 	var results []Page
 	if q != "" {
-		rows, err := db.Query("SELECT id, language, content FROM pages WHERE language = ? AND conten LIKE ?", language, "%"+q+"%")
-		if err == nil {
+		rows, err := db.Query("SELECT id, language, content FROM pages WHERE language=? AND content LIKE ?", language, "%"+q+"%")
+		if err != nil {
+			log.Println("DB query error:", err)
+		} else {
 			defer rows.Close()
 			for rows.Next() {
 				var p Page
@@ -87,60 +158,26 @@ func searchHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	tmpl.ExecuteTemplate(w, "search.hmtl", map[string]interface{}{
-		"search_results": results,
-		"query":          q,
+	renderTemplate(w, r, "search.html", map[string]interface{}{
+		"SearchResults": results,
+		"Query":         q,
 	})
 }
 
-func aboutHandler (w http.ResponseWriter, r *http.Request) {
-	tmpl.ExecuteTemplate(w, "about.html", nil)
-}
-
-func loginHandler (w http.ResponseWriter, r *http.Request) {
-	tmpl.ExecuteTemplate(w, "login.html", nil)
-}
-
-func registerHandler (w http.ResponseWriter, r *http.Request) {
-	tmpl.ExecuteTemplate(w, "register.html", nil)
-}
-
-//API handlers
-func apiSearchHandler (w http.ResponseWriter, r *http.Request) {
-	q := r.URL.Query().Get("q")
-	language := r.URL.Query().Get("language")
-	if language == "" {
-		language = "en"
-	}
-	var results []Page
-	if q != "" {
-		rows, err := db.Query("SELECT id, language, content FROM page WHERE language = ? AND content LIKE ?", language, "%"+q+"%")
-		if err == nil {
-			defer rows.Close()
-			for rows.Next() {
-				var p Page
-				rows.Scan(&p.ID, &p.Language, &p.Content)
-				results = append(results, p)
-			}
-		}
-	}
-	json.NewEncoder(w).Encode(map[string]interface{}{"search_resilts": results})
-}
-
-
-func apiLoginHandler (w http.ResponseWriter, r *http.Request) {
+func apiLoginHandler(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	username := r.FormValue("username")
 	password := r.FormValue("password")
 
 	user := User{}
-	err := db.QueryRow("SELECT id, username, email, password FROM user WHERE username = ?", username).Scan(&user.ID, &user.Username, &user.Email, &user.Password)
+	err := db.QueryRow("SELECT id, username, email, password FROM users WHERE username=?", username).
+		Scan(&user.ID, &user.Username, &user.Email, &user.Password)
 	if err != nil {
-		tmpl.ExecuteTemplate(w, "login.html", map[string]string{"error": "Invalid username"})
+		renderTemplate(w, r, "login.html", map[string]interface{}{"Error": "Invalid username"})
 		return
 	}
 	if !checkPassword(user.Password, password) {
-		tmpl.ExecuteTemplate(w, "login.html", map[string]string{"error": "Invalid password"})
+		renderTemplate(w, r, "login.html", map[string]interface{}{"Error": "Invalid password"})
 		return
 	}
 
@@ -151,48 +188,85 @@ func apiLoginHandler (w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/", http.StatusFound)
 }
 
-func apiRegisterHandler (w http.ResponseWriter, r *http.Request) {
-	r.ParseForm()
-	username := r.FormValue("username")
-	email := r.FormValue("email")
-	password := r.FormValue("password")
-	password2 := r.FormValue("password2")
+func apiRegisterHandler(w http.ResponseWriter, r *http.Request) {
+    // Parse form values
+    r.ParseForm()
+    username := r.FormValue("username")
+    email := r.FormValue("email")
+    password := r.FormValue("password")
+    password2 := r.FormValue("password2")
 
-	if username == "" || email == "" || password == "" {
-		tmpl.ExecuteTemplate(w, "register.html", map[string]string{"error": "All fields required"})
-		return
-	}
+    // Basic validation
+    if username == "" || email == "" || password == "" || password2 == "" {
+        renderTemplate(w, r, "layout.html", map[string]interface{}{
+            "Page":  "register",
+            "Error": "All fields are required",
+        })
+        return
+    }
 
-	if password != password2 {
-		tmpl.ExecuteTemplate(w, "register.html", map[string]string{"error": "Password do not match"})
-		return
-	}
+    if password != password2 {
+        renderTemplate(w, r, "layout.html", map[string]interface{}{
+            "Page":  "register",
+            "Error": "Passwords do not match",
+        })
+        return
+    }
 
-	var exists int
-	db.QueryRow("SELECT COUNT(*) FROM users WHERE username =?", username).Scan(&exists)
-	if exists > 0 {
-		tmpl.ExecuteTemplate(w, "register.html", map[string]string{"error": "Registration failed, Username already in use"})
-		return
-	}
+    // Check if username already exists
+    var exists int
+    err := db.QueryRow("SELECT COUNT(*) FROM users WHERE username=?", username).Scan(&exists)
+    if err != nil {
+        log.Println("DB error:", err)
+        renderTemplate(w, r, "layout.html", map[string]interface{}{
+            "Page":  "register",
+            "Error": "Internal error",
+        })
+        return
+    }
 
-	hash, _ := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	_, err := db.Exec("INSERT INTO users (username, email, password) VALUES (?, ?, ?)", username, email, string(hash))
-	if err != nil {
-		tmpl.ExecuteTemplate(w, "register.html", map[string]string{"error": "Registration failed"})
-		return
-	}
+    if exists > 0 {
+        renderTemplate(w, r, "layout.html", map[string]interface{}{
+            "Page":  "register",
+            "Error": "Username already in use",
+        })
+        return
+    }
 
-	http.Redirect(w, r, "/", http.StatusFound)
+    // Hash the password
+    hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+    if err != nil {
+        log.Println("Password hash error:", err)
+        renderTemplate(w, r, "layout.html", map[string]interface{}{
+            "Page":  "register",
+            "Error": "Internal error",
+        })
+        return
+    }
+
+    // Insert new user into database
+    _, err = db.Exec("INSERT INTO users (username, email, password) VALUES (?, ?, ?)", username, email, string(hash))
+    if err != nil {
+        log.Println("DB insert error:", err)
+        renderTemplate(w, r, "layout.html", map[string]interface{}{
+            "Page":  "register",
+            "Error": "Registration failed",
+        })
+        return
+    }
+
+    // Redirect to login page after successful registration
+    http.Redirect(w, r, "/login", http.StatusFound)
 }
 
-func apiLogoutHandler (w http.ResponseWriter, r *http.Request) {
+func apiLogoutHandler(w http.ResponseWriter, r *http.Request) {
 	sess, _ := sessionStore.Get(r, "session")
 	delete(sess.Values, "user_id")
 	sess.Save(r, w)
 	http.Redirect(w, r, "/", http.StatusFound)
 }
 
-//Security helpers
+// --- Security ---
 func checkPassword(hash string, password string) bool {
 	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) == nil
 }

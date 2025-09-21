@@ -1,43 +1,19 @@
-{% extends "layout.html" %}
-{% block title %}
-{% endblock %}
-{% block body %}
-<div>
-  <input id="search-input" placeholder="Search..." value="{{ request.args.get('q', '') }}"/>
-  <button id="search-button" onclick="makeSearchRequest()">Search</button>
-</div>
-
+{{ define "search_body" }}
+<h2>Search</h2>
+<form method="GET" action="/">
+  <input name="q" placeholder="Search..." value="{{ .Query }}">
+  <button type="submit">Search</button>
+</form>
 <div id="results">
-  {% for result in search_results %}
-  <div>
-      <h2><a class="search-result-title" href="{{ result.url }}">{{ result.title }}</a></h2>
-      <p class="search-result-description">{{ result.description }}</p>
-  </div>
-  {% endfor %}
+  {{ if .SearchResults }}
+    {{ range .SearchResults }}
+      <div>
+        <h3>Page {{ .ID }}</h3>
+        <p>{{ .Content }}</p>
+      </div>
+    {{ end }}
+  {{ else }}
+    <p>No results found.</p>
+  {{ end }}
 </div>
-
-<script>
-  let searchInput;
-
-  document.addEventListener('DOMContentLoaded', () => {
-    searchInput = document.getElementById("search-input");
-
-    // Focus the input field
-    searchInput.focus();
-
-    // Search when the user presses Enter
-    searchInput.addEventListener('keypress', (event) => {
-        if (event.key === 'Enter') {
-          makeSearchRequest();
-        }
-    });
-  });
-
-  function makeSearchRequest() {
-    const query = searchInput.value;
-    const url = new URL(window.location.href);
-    url.searchParams.set('q', query);
-    window.location.href = url.toString();
-  }
-</script>
-{% endblock %}
+{{ end }}

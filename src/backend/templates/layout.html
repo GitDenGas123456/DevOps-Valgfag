@@ -1,32 +1,41 @@
 <!doctype html>
-<title>¿Who Knows?</title>
-<link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='style.css') }}">
-<div class="page">
-  <div class="navigation">
-  <nav>
-    <h1><a id="nav-logo" href="{{ url_for('search') }}">¿Who Knows?</a></h1>
-    {% if g.user %}
-    <a id="nav-logout" href="{{ url_for('logout') }}">Log out [{{ g.user.username }}]</a>
-    {% else %}
-    <a id="nav-login" href="{{ url_for('login') }}">Log in</a>
-    <a id="nav-register" href="{{ url_for('register') }}">Register</a>
-    {% endif %}
-  </nav>
-  </div>
-  {% with flashes = get_flashed_messages() %}
-    {% if flashes %}
-      <ul class="flashes">
-      {% for message in flashes %}
-        <li>{{ message }}
-      {% endfor %}
-      </ul>
-    {% endif %}
-  {% endwith %}
-  <div class="body">
-  {% block body %}{% endblock %}
-  </div>
-  <div class="footer">
-    <span>¿Who Knows? &copy; 2009</span>
-    <a href="{{ url_for('about') }}">About</a>
-  </div>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>{{ block "title" . }}¿Who Knows?{{ end }}</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="page">
+    <nav>
+      <h1><a href="/">¿Who Knows?</a></h1>
+      {{ if .User }}
+        <a href="/api/logout">Log out [{{ .User.Username }}]</a>
+      {{ else }}
+        <a href="/login">Log in</a>
+        <a href="/register">Register</a>
+      {{ end }}
+    </nav>
+
+    <div class="body">
+  {{ if eq .Page "search" }}
+    {{ template "search_body" . }}
+  {{ else if eq .Page "login" }}
+    {{ template "login_body" . }}
+  {{ else if eq .Page "register" }}
+    {{ template "register_body" . }}
+  {{ else if eq .Page "about" }}
+    {{ template "about_body" . }}
+  {{ else }}
+    <p>Page not found.</p>
+  {{ end }}
 </div>
+
+    <footer>
+      <span>¿Who Knows? &copy; 2025</span>
+      <a href="/about">About</a>
+    </footer>
+  </div>
+</body>
+</html>
+

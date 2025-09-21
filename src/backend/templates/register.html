@@ -1,19 +1,13 @@
-{% extends "layout.html" %}
-{% block title %}Sign Up{% endblock %}
-{% block body %}
-  <h2>Sign Up</h2>
-  {% if error %}<div class="error"><strong>Error:</strong> {{ error }}</div>{% endif %}
-  <form action="/api/register" method="POST">
-    <dl>
-      <dt>Username:
-      <dd><input type="text" name="username" size="30" value="{{ request.form.username }}">
-      <dt>E-Mail:
-      <dd><input type="text" name="email" size="30" value="{{ request.form.email }}">
-      <dt>Password:
-      <dd><input type="password" name="password" size="30">
-      <dt>Password <small>(repeat)</small>:
-      <dd><input type="password" name="password2" size="30">
-    </dl>
-    <div class="actions"><input type="submit" value="Sign Up"></div>
-  </form>
-{% endblock %}
+{{ define "register_body" }}
+<h2>Sign Up</h2>
+{{ if .Error }}
+  <div class="error">{{ .Error }}</div>
+{{ end }}
+<form action="/api/register" method="POST">
+  <label>Username: <input type="text" name="username"></label><br>
+  <label>Email: <input type="email" name="email"></label><br>
+  <label>Password: <input type="password" name="password"></label><br>
+  <label>Repeat Password: <input type="password" name="password2"></label><br>
+  <button type="submit">Sign Up</button>
+</form>
+{{ end }}
