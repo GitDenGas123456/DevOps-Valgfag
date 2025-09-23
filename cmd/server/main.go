@@ -16,13 +16,14 @@ import (
 )
 
 var (
-	// #remember to move: globals into a small app/context struct in cmd/server or internal/app
+	// TODO: move these into a small app/context struct later
 	db           *sql.DB
 	tmpl         *template.Template
 	sessionStore *sessions.CookieStore
 )
 
-// #remember to move: domain types to internal/models (or next to handlers that use them)
+// --- Models (move to internal/models later) ---
+
 type User struct {
 	ID       int
 	Username string
@@ -30,20 +31,20 @@ type User struct {
 	Password string // bcrypt hash
 }
 
-// #remember to move: domain/query DTO types to internal/models (or handlers/search.go)
 type SearchResult struct {
 	ID       int
 	Language string
 	Content  string
 }
 
+// --- main ---
+
 func main() {
-	// --- env config (minimal) ---
 	port := getenv("PORT", "8080")
 	dbPath := getenv("DATABASE_PATH", "../whoknows.db")
 	sessionKey := getenv("SESSION_KEY", "development key") // dev fallback
 
-	// --- db setup (modernc driver) ---
+	// DB
 	var err error
 	db, err = sql.Open("sqlite", dbPath)
 	if err != nil {
@@ -51,30 +52,34 @@ func main() {
 	}
 	defer db.Close()
 
-	// --- templates ---
-	// layout.html + page files define unique content templates (about-content, login-content, etc.)
+	// Templates
+	// Expect files like:
+	//   templates/layout.html            (defines {{define "base"}} ... {{block "content" .}}{{end}} ... {{end}})
+	//   templates/page-search.html       (defines "search" + overrides "content")
+	//   templates/page-about.html        (defines "about"  + overrides "content")
+	//   templates/page-login.html        (defines "login"  + overrides "content")
+	//   templates/page-register.html     (defines "register" + overrides "content")
 	tmpl = template.Must(template.ParseGlob("./templates/*.html"))
 
-	// --- sessions ---
+	// Sessions
 	sessionStore = sessions.NewCookieStore([]byte(sessionKey))
 
-	// --- router ---
+	// Router
 	r := mux.NewRouter()
 
-	// static files
+	// Static
 	fs := http.FileServer(http.Dir("static"))
 	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", fs))
 
-	// pages
+	// Pages
 	r.HandleFunc("/", SearchPageHandler).Methods("GET")
 	r.HandleFunc("/about", AboutPageHandler).Methods("GET")
 	r.HandleFunc("/login", LoginPageHandler).Methods("GET")
 	r.HandleFunc("/register", RegisterPageHandler).Methods("GET")
 
-	// auth/api
+	// API
 	r.HandleFunc("/api/login", APILoginHandler).Methods("POST")
 	r.HandleFunc("/api/register", APIRegisterHandler).Methods("POST")
-	// allow GET so the navbar link works
 	r.HandleFunc("/api/logout", APILogoutHandler).Methods("POST", "GET")
 	r.HandleFunc("/api/search", APISearchHandler).Methods("POST")
 
@@ -110,7 +115,8 @@ func SearchPageHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	renderTemplate(w, "search-content", map[string]any{
+	// Execute the WRAPPER template "search"
+	renderTemplate(w, "search", map[string]any{
 		"Title":   "",
 		"Query":   q,
 		"Results": results,
@@ -118,19 +124,19 @@ func SearchPageHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func AboutPageHandler(w http.ResponseWriter, r *http.Request) {
-	renderTemplate(w, "about-content", map[string]any{
+	renderTemplate(w, "about", map[string]any{
 		"Title": "About",
 	})
 }
 
 func LoginPageHandler(w http.ResponseWriter, r *http.Request) {
-	renderTemplate(w, "login-content", map[string]any{
+	renderTemplate(w, "login", map[string]any{
 		"Title": "Sign In",
 	})
 }
 
 func RegisterPageHandler(w http.ResponseWriter, r *http.Request) {
-	renderTemplate(w, "register-content", map[string]any{
+	renderTemplate(w, "register", map[string]any{
 		"Title": "Sign Up",
 	})
 }
@@ -180,11 +186,11 @@ func APILoginHandler(w http.ResponseWriter, r *http.Request) {
 		username,
 	).Scan(&u.ID, &u.Username, &u.Email, &u.Password)
 	if err != nil {
-		renderTemplate(w, "login-content", map[string]any{"Title": "Sign In", "error": "Invalid username"})
+		renderTemplate(w, "login", map[string]any{"Title": "Sign In", "error": "Invalid username"})
 		return
 	}
 	if bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(password)) != nil {
-		renderTemplate(w, "login-content", map[string]any{"Title": "Sign In", "error": "Invalid password", "username": username})
+		renderTemplate(w, "login", map[string]any{"Title": "Sign In", "error": "Invalid password", "username": username})
 		return
 	}
 
@@ -206,18 +212,18 @@ func APIRegisterHandler(w http.ResponseWriter, r *http.Request) {
 	pw2 := r.FormValue("password2")
 
 	if username == "" || email == "" || pw1 == "" {
-		renderTemplate(w, "register-content", map[string]any{"Title": "Sign Up", "error": "All fields required"})
+		renderTemplate(w, "register", map[string]any{"Title": "Sign Up", "error": "All fields required"})
 		return
 	}
 	if pw1 != pw2 {
-		renderTemplate(w, "register-content", map[string]any{"Title": "Sign Up", "error": "Password do not match"})
+		renderTemplate(w, "register", map[string]any{"Title": "Sign Up", "error": "Password do not match"})
 		return
 	}
 
 	var exists int
 	_ = db.QueryRow(`SELECT COUNT(*) FROM users WHERE username = ?`, username).Scan(&exists)
 	if exists > 0 {
-		renderTemplate(w, "register-content", map[string]any{"Title": "Sign Up", "error": "Registration failed, Username already in use"})
+		renderTemplate(w, "register", map[string]any{"Title": "Sign Up", "error": "Registration failed, Username already in use"})
 		return
 	}
 
@@ -227,7 +233,7 @@ func APIRegisterHandler(w http.ResponseWriter, r *http.Request) {
 		username, email, string(hash),
 	)
 	if err != nil {
-		renderTemplate(w, "register-content", map[string]any{"Title": "Sign Up", "error": "Registration failed"})
+		renderTemplate(w, "register", map[string]any{"Title": "Sign Up", "error": "Registration failed"})
 		return
 	}
 
@@ -242,20 +248,19 @@ func APILogoutHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // =====================
-//  Helpers
+// Helpers
 // =====================
 
-// Always execute the shared "layout" template and tell it which content template to render.
-func renderTemplate(w http.ResponseWriter, contentTemplate string, data map[string]any) {
+func renderTemplate(w http.ResponseWriter, page string, data map[string]any) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if data == nil {
 		data = map[string]any{}
 	}
-	data["ContentTemplate"] = contentTemplate
 	if _, ok := data["Title"]; !ok {
 		data["Title"] = ""
 	}
-	if err := tmpl.ExecuteTemplate(w, "layout", data); err != nil {
+	// Execute the page wrapper ("search", "about", "login", "register")
+	if err := tmpl.ExecuteTemplate(w, page, data); err != nil {
 		http.Error(w, "template exec error: "+err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -268,7 +273,6 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	}
 }
 
-// tiny env helper
 func getenv(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
 		return v

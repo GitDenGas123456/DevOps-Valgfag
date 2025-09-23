@@ -1,6 +1,5 @@
-{{define "title"}}Sign Up{{end}}
-
-{{define "body"}}
+{{define "register"}}
+  {{template "header" .}}
   <h2>Sign Up</h2>
   {{if .error}}<div class="error"><strong>Error:</strong> {{.error}}</div>{{end}}
   <form action="/api/register" method="POST">
@@ -16,6 +15,5 @@
     </dl>
     <div class="actions"><input type="submit" value="Sign Up"></div>
   </form>
+  {{template "footer" .}}
 {{end}}
-
-{{define "page-register"}}{{template "layout" .}}{{end}}

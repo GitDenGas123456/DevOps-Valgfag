@@ -1,6 +1,5 @@
-{{define "title"}}Sign In{{end}}
-
-{{define "body"}}
+{{define "login"}}
+  {{template "header" .}}
   <h2>Log In</h2>
   {{if .error}}<div class="error"><strong>Error:</strong> {{.error}}</div>{{end}}
   <form action="/api/login" method="POST">
@@ -12,6 +11,5 @@
     </dl>
     <div class="actions"><input type="submit" value="Log In"></div>
   </form>
+  {{template "footer" .}}
 {{end}}
-
-{{define "page-login"}}{{template "layout" .}}{{end}}
