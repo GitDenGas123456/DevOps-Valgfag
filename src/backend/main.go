@@ -1,20 +1,18 @@
 package main
 
 import (
-	"database/sql"
 	"fmt"
 	"html/template"
 	"log"
 	"net/http"
 
-	_ "github.com/mattn/go-sqlite3"
+	"github.com/GitDenGas123456/DevOps-Valgfag/src/database"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/sessions"
 	"golang.org/x/crypto/bcrypt"
 )
 
 var (
-	db           *sql.DB
 	tmpl         *template.Template
 	sessionStore = sessions.NewCookieStore([]byte("development key"))
 )
@@ -35,12 +33,9 @@ type Page struct {
 
 // --- Main ---
 func main() {
-	var err error
-	db, err = sql.Open("sqlite3", "./whoknows.db")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close()
+	// Initialize DB from the database package
+	database.InitDB("../database/whoknows.db")
+	defer database.DB.Close()
 
 	// Parse templates including layout
 	tmpl = template.Must(template.ParseGlob("templates/*.html"))
@@ -64,10 +59,7 @@ func main() {
 	r.HandleFunc("/api/search", apiSearchHandler).Methods("POST")
 
 	fmt.Println("Server running on :8080")
-	err = http.ListenAndServe(":8080", r)
-	if err != nil {
-		log.Fatal(err)
-	}
+	log.Fatal(http.ListenAndServe(":8080", r))
 }
 
 // --- Template Helper ---
@@ -80,7 +72,7 @@ func renderTemplate(w http.ResponseWriter, r *http.Request, tmplName string, dat
 	sess, _ := sessionStore.Get(r, "session")
 	if userID, ok := sess.Values["user_id"].(int); ok {
 		user := User{}
-		err := db.QueryRow("SELECT id, username, email FROM users WHERE id=?", userID).
+		err := database.DB.QueryRow("SELECT id, username, email FROM users WHERE id=?", userID).
 			Scan(&user.ID, &user.Username, &user.Email)
 		if err == nil {
 			data["User"] = user
@@ -97,41 +89,41 @@ func renderTemplate(w http.ResponseWriter, r *http.Request, tmplName string, dat
 
 // --- Page Handlers ---
 func loginHandler(w http.ResponseWriter, r *http.Request) {
-    renderTemplate(w, r, "layout.html", map[string]interface{}{
-        "Page": "login",  // must match layout.html check
-    })
+	renderTemplate(w, r, "layout.html", map[string]interface{}{
+		"Page": "login",
+	})
 }
 
 func registerHandler(w http.ResponseWriter, r *http.Request) {
-    renderTemplate(w, r, "layout.html", map[string]interface{}{
-        "Page": "register",  // must match layout.html check
-    })
+	renderTemplate(w, r, "layout.html", map[string]interface{}{
+		"Page": "register",
+	})
 }
 
 func aboutHandler(w http.ResponseWriter, r *http.Request) {
-    renderTemplate(w, r, "layout.html", map[string]interface{}{
-        "Page": "about",  // must match layout.html check
-    })
+	renderTemplate(w, r, "layout.html", map[string]interface{}{
+		"Page": "about",
+	})
 }
 
 func searchHandler(w http.ResponseWriter, r *http.Request) {
-    q := r.URL.Query().Get("q")
-    results := []Page{}
-    if q != "" {
-        rows, _ := db.Query("SELECT id, language, content FROM pages WHERE content LIKE ?", "%"+q+"%")
-        defer rows.Close()
-        for rows.Next() {
-            var p Page
-            rows.Scan(&p.ID, &p.Language, &p.Content)
-            results = append(results, p)
-        }
-    }
+	q := r.URL.Query().Get("q")
+	results := []Page{}
+	if q != "" {
+		rows, _ := database.DB.Query("SELECT id, language, content FROM pages WHERE content LIKE ?", "%"+q+"%")
+		defer rows.Close()
+		for rows.Next() {
+			var p Page
+			rows.Scan(&p.ID, &p.Language, &p.Content)
+			results = append(results, p)
+		}
+	}
 
-    renderTemplate(w, r, "layout.html", map[string]interface{}{
-        "Page": "search",  // must match layout.html check
-        "Query": q,
-        "SearchResults": results,
-    })
+	renderTemplate(w, r, "layout.html", map[string]interface{}{
+		"Page":          "search",
+		"Query":         q,
+		"SearchResults": results,
+	})
 }
 
 // --- API Handlers ---
@@ -145,7 +137,7 @@ func apiSearchHandler(w http.ResponseWriter, r *http.Request) {
 
 	var results []Page
 	if q != "" {
-		rows, err := db.Query("SELECT id, language, content FROM pages WHERE language=? AND content LIKE ?", language, "%"+q+"%")
+		rows, err := database.DB.Query("SELECT id, language, content FROM pages WHERE language=? AND content LIKE ?", language, "%"+q+"%")
 		if err != nil {
 			log.Println("DB query error:", err)
 		} else {
@@ -170,7 +162,7 @@ func apiLoginHandler(w http.ResponseWriter, r *http.Request) {
 	password := r.FormValue("password")
 
 	user := User{}
-	err := db.QueryRow("SELECT id, username, email, password FROM users WHERE username=?", username).
+	err := database.DB.QueryRow("SELECT id, username, email, password FROM users WHERE username=?", username).
 		Scan(&user.ID, &user.Username, &user.Email, &user.Password)
 	if err != nil {
 		renderTemplate(w, r, "login.html", map[string]interface{}{"Error": "Invalid username"})
@@ -189,74 +181,71 @@ func apiLoginHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func apiRegisterHandler(w http.ResponseWriter, r *http.Request) {
-    // Parse form values
-    r.ParseForm()
-    username := r.FormValue("username")
-    email := r.FormValue("email")
-    password := r.FormValue("password")
-    password2 := r.FormValue("password2")
+	r.ParseForm()
+	username := r.FormValue("username")
+	email := r.FormValue("email")
+	password := r.FormValue("password")
+	password2 := r.FormValue("password2")
 
-    // Basic validation
-    if username == "" || email == "" || password == "" || password2 == "" {
-        renderTemplate(w, r, "layout.html", map[string]interface{}{
-            "Page":  "register",
-            "Error": "All fields are required",
-        })
-        return
-    }
+	// Validation
+	if username == "" || email == "" || password == "" || password2 == "" {
+		renderTemplate(w, r, "layout.html", map[string]interface{}{
+			"Page":  "register",
+			"Error": "All fields are required",
+		})
+		return
+	}
 
-    if password != password2 {
-        renderTemplate(w, r, "layout.html", map[string]interface{}{
-            "Page":  "register",
-            "Error": "Passwords do not match",
-        })
-        return
-    }
+	if password != password2 {
+		renderTemplate(w, r, "layout.html", map[string]interface{}{
+			"Page":  "register",
+			"Error": "Passwords do not match",
+		})
+		return
+	}
 
-    // Check if username already exists
-    var exists int
-    err := db.QueryRow("SELECT COUNT(*) FROM users WHERE username=?", username).Scan(&exists)
-    if err != nil {
-        log.Println("DB error:", err)
-        renderTemplate(w, r, "layout.html", map[string]interface{}{
-            "Page":  "register",
-            "Error": "Internal error",
-        })
-        return
-    }
+	// Check if username exists
+	var exists int
+	err := database.DB.QueryRow("SELECT COUNT(*) FROM users WHERE username=?", username).Scan(&exists)
+	if err != nil {
+		log.Println("DB error:", err)
+		renderTemplate(w, r, "layout.html", map[string]interface{}{
+			"Page":  "register",
+			"Error": "Internal error",
+		})
+		return
+	}
+	if exists > 0 {
+		renderTemplate(w, r, "layout.html", map[string]interface{}{
+			"Page":  "register",
+			"Error": "Username already in use",
+		})
+		return
+	}
 
-    if exists > 0 {
-        renderTemplate(w, r, "layout.html", map[string]interface{}{
-            "Page":  "register",
-            "Error": "Username already in use",
-        })
-        return
-    }
+	// Hash password
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		log.Println("Password hash error:", err)
+		renderTemplate(w, r, "layout.html", map[string]interface{}{
+			"Page":  "register",
+			"Error": "Internal error",
+		})
+		return
+	}
 
-    // Hash the password
-    hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-    if err != nil {
-        log.Println("Password hash error:", err)
-        renderTemplate(w, r, "layout.html", map[string]interface{}{
-            "Page":  "register",
-            "Error": "Internal error",
-        })
-        return
-    }
+	// Insert user
+	_, err = database.DB.Exec("INSERT INTO users (username, email, password) VALUES (?, ?, ?)", username, email, string(hash))
+	if err != nil {
+		log.Println("DB insert error:", err)
+		renderTemplate(w, r, "layout.html", map[string]interface{}{
+			"Page":  "register",
+			"Error": "Registration failed",
+		})
+		return
+	}
 
-    // Insert new user into database
-    _, err = db.Exec("INSERT INTO users (username, email, password) VALUES (?, ?, ?)", username, email, string(hash))
-    if err != nil {
-        log.Println("DB insert error:", err)
-        renderTemplate(w, r, "layout.html", map[string]interface{}{
-            "Page":  "register",
-            "Error": "Registration failed",
-        })
-        return
-    }
-
-    // Redirect to login page after successful registration
-    http.Redirect(w, r, "/login", http.StatusFound)
+	http.Redirect(w, r, "/login", http.StatusFound)
 }
 
 func apiLogoutHandler(w http.ResponseWriter, r *http.Request) {

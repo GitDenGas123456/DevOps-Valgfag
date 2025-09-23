@@ -1,4 +1,4 @@
-module DEVOPS-VALGFAG
+module github.com/GitDenGas123456/DevOps-Valgfag
 
 go 1.25.1
 
