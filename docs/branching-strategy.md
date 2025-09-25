@@ -47,6 +47,23 @@ This repository follows a lightweight GitFlow-inspired workflow that keeps `main
    git push origin develop
    ```
 
+## Renaming Generated Branches
+If a tool or UI opened a pull request from a generated branch name such as `codex/explain-codebase-structure`, you can move the changes onto a convention-compliant branch without rewriting your work:
+
+1. Check out the existing branch locally:
+   ```bash
+   git checkout codex/explain-codebase-structure
+   ```
+2. Rename it to the desired topic-branch name, for example `docs/branching-structure`:
+   ```bash
+   git branch -m docs/branching-structure
+   ```
+3. Push the renamed branch and set the upstream:
+   ```bash
+   git push -u origin docs/branching-structure
+   ```
+4. Update the open pull request to use the new branch. If the hosting service does not allow changing the source branch, close the old PR and open a new one from `docs/branching-structure`.
+
 ## Additional Notes
 - Keep topic branches focused and short-lived; delete them on the remote after merging.
 - Rebase topic branches on top of `develop` to reduce merge conflicts, but never rewrite history of shared branches (`main`, `develop`).
