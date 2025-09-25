@@ -68,3 +68,9 @@ jobs:
         with:
           name: coverage-${{ matrix.go-version }}
           path: coverage.out
+          
+      - name: Run golangci-lint
+  uses: golangci/golangci-lint-action@v8
+  with:
+    version: latest
+    args: run ./...
