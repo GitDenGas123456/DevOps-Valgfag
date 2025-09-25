@@ -6,16 +6,14 @@ on:
   pull_request:
     branches: [ main, master ]
 
-concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   build:
+    concurrency:
+      group: ci-build-${{ github.ref }}
+      cancel-in-progress: true
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        # Brug go.mod eller de to seneste Go-versioner
         go-version: [ "1.24", "1.25" ]
     steps:
       - name: Checkout repository
@@ -24,7 +22,6 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          # Alternativt: go-version-file: go.mod
           go-version: ${{ matrix.go-version }}
           check-latest: true
           cache: true
@@ -32,8 +29,6 @@ jobs:
       - name: Print go version
         run: go version
 
-      # (Valgfrit) Ekstra build-cache – setup-go cacher allerede,
-      # men denne kan give lidt ekstra fart for build artifacts.
       - name: Cache Go build cache
         uses: actions/cache@v4
         with:
@@ -68,3 +63,17 @@ jobs:
         with:
           name: coverage-${{ matrix.go-version }}
           path: coverage.out
+
+  hadolint:
+    concurrency:
+      group: ci-lint-${{ github.ref }}
+      cancel-in-progress: true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Lint Dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Dockerfile
