@@ -1,0 +1,20 @@
+{{define "footer"}}
+  </main>
+  <script>
+    let searchInput;
+    document.addEventListener('DOMContentLoaded', () => {
+      searchInput = document.getElementById("search-input");
+      if (searchInput) {
+        searchInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') makeSearchRequest(); });
+      }
+    });
+    function makeSearchRequest() {
+      const query = (searchInput && searchInput.value) || '';
+      const url = new URL(window.location.href);
+      url.searchParams.set('q', query);
+      window.location.href = url.toString();
+    }
+  </script>
+</body>
+</html>
+{{end}}

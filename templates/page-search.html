@@ -1,0 +1,16 @@
+﻿{{define "search"}}
+  {{template "header" .}}
+  {{if .Results}}
+    <div id="results">
+      {{range .Results}}
+        <div>
+          <h2><a class="search-result-title" href="{{ .URL }}">{{ .Title }}</a></h2>
+          <p class="search-result-description">{{ .Description }}</p>
+        </div>
+      {{end}}
+    </div>
+  {{else}}
+    <p><em>No results</em></p>
+  {{end}}
+  {{template "footer" .}}
+{{end}}

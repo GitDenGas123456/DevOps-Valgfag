@@ -1,12 +1,12 @@
-module DEVOPS-VALGFAG
+module devops-valgfag
 
-go 1.25.1
+go 1.25
 
 require (
 	github.com/gorilla/mux v1.8.1
 	github.com/gorilla/sessions v1.4.0
-	github.com/mattn/go-sqlite3 v1.14.32
 	golang.org/x/crypto v0.42.0
+	modernc.org/sqlite v1.39.0
 )
 
 require (
@@ -21,5 +21,4 @@ require (
 	modernc.org/libc v1.66.3 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
-	modernc.org/sqlite v1.39.0 // indirect
 )
