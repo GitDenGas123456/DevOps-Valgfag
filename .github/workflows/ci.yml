@@ -55,3 +55,18 @@ jobs:
         with:
           name: coverage-${{ matrix.go-version }}
           path: coverage.out
+
+  hadolint:
+    needs: build
+    runs-on: ubuntu-latest
+    concurrency:
+      group: ci-lint-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Lint Dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Dockerfile
