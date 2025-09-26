@@ -11,3 +11,5 @@ venv/
 # OS/editor files
 .DS_Store
 *.swp
+
+legacy

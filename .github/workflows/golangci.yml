@@ -1,0 +1,18 @@
+run:
+  timeout: 5m
+linters:
+  enable:
+    - staticcheck
+    - revive
+    - gosec
+    - errcheck
+    - ineffassign
+    - unparam
+issues:
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - revive
+    - linters:
+        - errcheck
+      text: "Close"

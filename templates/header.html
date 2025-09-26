@@ -1,0 +1,24 @@
+{{define "header"}}
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>{{.Title}}{{if .Title}} – {{end}}WhoKnows</title>
+  <link rel="stylesheet" href="/static/style.css"/>
+</head>
+<body>
+  <nav class="nav">
+    <a href="/">WhoKnows</a>
+    <a href="/?q=">Search</a>
+    <a href="/about">About</a>
+    <a href="/login">Login</a>
+    <a href="/register">Sign Up</a>
+  </nav>
+
+  <div class="searchbar">
+    <input id="search-input" placeholder="Search..." value="{{ .Query }}">
+    <button id="search-button" onclick="makeSearchRequest()">Search</button>
+  </div>
+
+  <main>
+{{end}}
