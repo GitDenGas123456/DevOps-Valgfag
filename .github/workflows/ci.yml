@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # Ændret til valid Go-versioner
+        go-version: [ "1.22.x", "1.23.x" ]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          # Alternativt: go-version-file: go.mod
+          go-version: ${{ matrix.go-version }}
+          check-latest: true
+          cache: true
+
+      - name: Print go version
+        run: go version
+
+      # (Valgfrit) Ekstra build-cache – setup-go cacher allerede,
+      # men denne kan give lidt ekstra fart for build artifacts.
+      - name: Cache Go build cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+          key: ${{ runner.os }}-gobuild-${{ matrix.go-version }}-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-gobuild-${{ matrix.go-version }}-
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Run go vet
+        run: go vet ./...
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v8
+        with:
+          version: latest
+          args: run ./...
+
+      - name: Run tests
+        run: go test -v -race ./... -coverprofile=coverage.out
+
+      - name: Show coverage summary
+        if: ${{ always() && hashFiles('coverage.out') != '' }}
+        run: go tool cover -func=coverage.out | sed -n '1,200p'
+
+      - name: Upload coverage (artifact)
+        if: ${{ hashFiles('coverage.out') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.go-version }}
+          path: coverage.out
