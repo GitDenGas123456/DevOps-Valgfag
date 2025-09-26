@@ -1,18 +1,20 @@
-run:
-  timeout: 5m
-linters:
-  enable:
-    - staticcheck
-    - revive
-    - gosec
-    - errcheck
-    - ineffassign
-    - unparam
-issues:
-  exclude-rules:
-    - path: _test\.go
-      linters:
-        - revive
-    - linters:
-        - errcheck
-      text: "Close"
+name: golangci-lint
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  golangci:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
