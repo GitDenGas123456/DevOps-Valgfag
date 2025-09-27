@@ -1,0 +1,25 @@
+name: Scheduled Go Task
+
+on:
+  schedule:
+    - cron: "0 * * * *" # runs every hour at minute 0
+  workflow_dispatch: # allows manual trigger
+
+jobs:
+  run-go-task:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21' # adjust to your Go version
+
+      - name: Build Go program
+        run: go build -o myapp ./cmd/myapp
+
+      - name: Run Go program
+        run: ./myapp

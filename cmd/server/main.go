@@ -41,7 +41,7 @@ type SearchResult struct {
 
 func main() {
 	port := getenv("PORT", "8080")
-	dbPath := getenv("DATABASE_PATH", "../whoknows.db")
+	dbPath := getenv("DATABASE_PATH", "internal/db/whoknows.db")
 	sessionKey := getenv("SESSION_KEY", "development key") // dev fallback
 
 	// DB
