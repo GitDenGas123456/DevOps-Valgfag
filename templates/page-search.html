@@ -1,16 +1,37 @@
 ﻿{{define "search"}}
   {{template "header" .}}
-  {{if .Results}}
-    <div id="results">
-      {{range .Results}}
-        <div>
-          <h2><a class="search-result-title" href="{{ .URL }}">{{ .Title }}</a></h2>
-          <p class="search-result-description">{{ .Description }}</p>
-        </div>
-      {{end}}
+
+  <!-- Full-bleed hero with blue sky + clouds -->
+  <section class="hero-bleed">
+    <div class="clouds" aria-hidden="true">
+      <div class="cloud layer-a"></div>
+      <div class="cloud layer-b"></div>
     </div>
-  {{else}}
-    <p><em>No results</em></p>
-  {{end}}
+
+    <div class="hero-slab container">
+      <h1 class="hero-title">Search the web</h1>
+      <div class="search-pill">
+        <input id="search-input" class="pill-input" placeholder="Search anything…" value="{{ .Query }}">
+        <button id="search-button" class="pill-button" onclick="makeSearchRequest()">Search</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Results -->
+  <section class="container">
+    {{if .Results}}
+      <div class="results-grid">
+        {{range .Results}}
+          <article class="result-card">
+            <h3><a href="{{ .URL }}">{{ .Title }}</a></h3>
+            <p class="muted">{{ .Description }}</p>
+          </article>
+        {{end}}
+      </div>
+    {{else}}
+      <p class="muted"><em>No results</em></p>
+    {{end}}
+  </section>
+
   {{template "footer" .}}
 {{end}}
