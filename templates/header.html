@@ -1,24 +1,25 @@
 {{define "header"}}
 <!doctype html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>{{.Title}}{{if .Title}} – {{end}}WhoKnows</title>
   <link rel="stylesheet" href="/static/style.css"/>
 </head>
 <body>
-  <nav class="nav">
-    <a href="/">WhoKnows</a>
-    <a href="/?q=">Search</a>
-    <a href="/about">About</a>
-    <a href="/login">Login</a>
-    <a href="/register">Sign Up</a>
-  </nav>
+  <header class="site-header">
+    <nav class="nav container" style="display:flex;align-items:center;justify-content:space-between;height:68px">
+      <a class="brand" href="/">WhoKnows<span class="dot">?</span></a>
+      <ul class="nav-links" style="list-style:none;margin:0;padding:0;display:flex;align-items:center;gap:12px">
+        <li><a class="nav-link" href="/?q=">Search</a></li>
+        <li><a class="nav-link" href="/about">About</a></li>
+        <li class="sep" style="width:1px;height:22px;background:var(--hairline);margin:0 8px"></li>
+        <li><a class="nav-link" href="/login">Login</a></li>
+        <li><a class="btn btn-primary" href="/register">Sign Up</a></li>
+      </ul>
+    </nav>
+  </header>
 
-  <div class="searchbar">
-    <input id="search-input" placeholder="Search..." value="{{ .Query }}">
-    <button id="search-button" onclick="makeSearchRequest()">Search</button>
-  </div>
-
-  <main>
+  <main class="container content">
 {{end}}

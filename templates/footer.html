@@ -1,13 +1,43 @@
 {{define "footer"}}
   </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <div class="footer-left">
+        <span class="footer-brand">¿WhoKnows? © {{now.Year}}</span>
+      </div>
+      <ul class="footer-links">
+        <li><a href="/about">About</a></li>
+        <li><a href="/?q=">Search</a></li>
+        <li><a href="/login">Login</a></li>
+      </ul>
+    </div>
+  </footer>
+
   <script>
+    // Search box handling (used on hero search)
     let searchInput;
     document.addEventListener('DOMContentLoaded', () => {
       searchInput = document.getElementById("search-input");
       if (searchInput) {
-        searchInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') makeSearchRequest(); });
+        searchInput.addEventListener('keypress', (e) => {
+          if (e.key === 'Enter') makeSearchRequest();
+        });
       }
+
+      // Optional subtle parallax for clouds if present
+      const root = document.querySelector('.clouds');
+      if (!root) return;
+      const a = root.querySelector('.layer-a');
+      const b = root.querySelector('.layer-b');
+      const onScroll = () => {
+        const y = window.scrollY || 0;
+        if (a) a.style.transform = `translateY(${y * 0.05}px)`;
+        if (b) b.style.transform = `translateY(${y * 0.08}px)`;
+      };
+      window.addEventListener('scroll', onScroll, { passive: true });
     });
+
     function makeSearchRequest() {
       const query = (searchInput && searchInput.value) || '';
       const url = new URL(window.location.href);

@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/sessions"
@@ -52,14 +53,12 @@ func main() {
 	}
 	defer db.Close()
 
-	// Templates
-	// Expect files like:
-	//   templates/layout.html            (defines {{define "base"}} ... {{block "content" .}}{{end}} ... {{end}})
-	//   templates/page-search.html       (defines "search" + overrides "content")
-	//   templates/page-about.html        (defines "about"  + overrides "content")
-	//   templates/page-login.html        (defines "login"  + overrides "content")
-	//   templates/page-register.html     (defines "register" + overrides "content")
-	tmpl = template.Must(template.ParseGlob("./templates/*.html"))
+	// Templates with FuncMap so {{ now }} and {{ now.Year }} (or {{ year }}) work
+	funcs := template.FuncMap{
+		"now":  time.Now,
+		"year": func() int { return time.Now().Year() },
+	}
+	tmpl = template.Must(template.New("").Funcs(funcs).ParseGlob("./templates/*.html"))
 
 	// Sessions
 	sessionStore = sessions.NewCookieStore([]byte(sessionKey))
