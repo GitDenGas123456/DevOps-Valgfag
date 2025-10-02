@@ -19,7 +19,7 @@ jobs:
           go-version: '1.21' # adjust to your Go version
 
       - name: Build Go program
-        run: go build -o myapp ./cmd/myapp
+        run: go build -o myapp ./cmd/server
 
       - name: Run Go program
         run: ./myapp
