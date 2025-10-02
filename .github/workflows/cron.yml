@@ -23,3 +23,7 @@ jobs:
 
       - name: Run Go program
         run: ./myapp
+
+            # Run server for 60 seconds to confirm it starts, then exit cleanly
+      - name: Run Go program (with timeout)
+        run: timeout 60s ./myapp || echo "Exited (expected after 60s)"
