@@ -21,8 +21,7 @@ jobs:
       - name: Build Go program
         run: go build -o myapp ./cmd/server
 
-      - name: Run Go program
-        run: ./myapp
+
 
             # Run server for 60 seconds to confirm it starts, then exit cleanly
       - name: Run Go program (with timeout)
