@@ -1,7 +1,29 @@
+# Git-related
 .git
 .gitignore
+
+# IDE / Editor files
+.vscode
+.idea
+
+# OS-specific junk
 **/.DS_Store
-**/node_modules
+Thumbs.db
+
+# Build artifacts
 **/bin
 **/obj
-**/*.log
+*.exe
+*.out
+*.log
+
+# Temporary or cache files
+*.tmp
+*.swp
+
+# Docker-specific
+Dockerfile
+
+
+# Database (optional — comment this out if you want to copy it into the image)
+#internal/db/whoknows.db
