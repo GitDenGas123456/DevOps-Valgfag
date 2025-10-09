@@ -1,0 +1,180 @@
+basePath: /
+definitions:
+  main.AuthResponse:
+    properties:
+      message:
+        example: Login successful
+        type: string
+      statusCode:
+        example: 200
+        type: integer
+    type: object
+  main.SearchResponse:
+    properties:
+      search_results:
+        items:
+          $ref: '#/definitions/main.SearchResult'
+        type: array
+    type: object
+  main.SearchResult:
+    properties:
+      content:
+        example: Sample content
+        type: string
+      id:
+        example: 1
+        type: integer
+      language:
+        example: en
+        type: string
+    type: object
+info:
+  contact: {}
+  description: Application user with login credentials
+  title: WhoKnows API
+  version: 0.1.0
+paths:
+  /about:
+    get:
+      produces:
+      - text/html
+      responses:
+        "200":
+          description: HTML content
+          schema:
+            type: string
+      summary: Serve About Page
+      tags:
+      - Pages
+  /api/login:
+    post:
+      consumes:
+      - application/x-www-form-urlencoded
+      description: Authenticate a user with username and password
+      parameters:
+      - description: Username
+        in: formData
+        name: username
+        required: true
+        type: string
+      - description: Password
+        in: formData
+        name: password
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.AuthResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.AuthResponse'
+      summary: Login
+      tags:
+      - API
+  /api/logout:
+    get:
+      description: Log out the current user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.AuthResponse'
+      summary: Logout
+      tags:
+      - API
+  /api/register:
+    post:
+      consumes:
+      - application/x-www-form-urlencoded
+      description: Register a new user
+      parameters:
+      - description: Username
+        in: formData
+        name: username
+        required: true
+        type: string
+      - description: Email
+        in: formData
+        name: email
+        required: true
+        type: string
+      - description: Password
+        in: formData
+        name: password
+        required: true
+        type: string
+      - description: Password Confirmation
+        in: formData
+        name: password2
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.AuthResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.AuthResponse'
+      summary: Register
+      tags:
+      - API
+  /api/search:
+    post:
+      consumes:
+      - application/json
+      description: Search for content by query and language
+      parameters:
+      - description: Search query
+        in: query
+        name: q
+        required: true
+        type: string
+      - description: Language code (e.g., 'en')
+        in: query
+        name: language
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.SearchResponse'
+      summary: Search
+      tags:
+      - API
+  /login:
+    get:
+      produces:
+      - text/html
+      responses:
+        "200":
+          description: HTML content
+          schema:
+            type: string
+      summary: Serve Login Page
+      tags:
+      - Pages
+  /register:
+    get:
+      produces:
+      - text/html
+      responses:
+        "200":
+          description: HTML content
+          schema:
+            type: string
+      summary: Serve Register Page
+      tags:
+      - Pages
+swagger: "2.0"

@@ -1,3 +1,7 @@
+// @title WhoKnows API
+// @version 0.1.0
+// @description API specification for the WhoKnows web application
+// @BasePath /
 package main
 
 import (
@@ -14,7 +18,15 @@ import (
 	"github.com/gorilla/sessions"
 	_ "modernc.org/sqlite"
 	"golang.org/x/crypto/bcrypt"
+
+	httpSwagger "github.com/swaggo/http-swagger" // ✅ Swagger HTTP handler
+	_ "devops-valgfag/docs"                    // ✅ Replace with your module name (e.g., "github.com/you/whoknows/docs")
+
 )
+
+// =====================
+// Globals
+// =====================
 
 var (
 	// TODO: move these into a small app/context struct later
@@ -23,22 +35,39 @@ var (
 	sessionStore *sessions.CookieStore
 )
 
-// --- Models (move to internal/models later) ---
+// =====================
+// Models
+// =====================
 
+// User represents an application user
+// @Description Application user with login credentials
 type User struct {
-	ID       int
-	Username string
-	Email    string
-	Password string // bcrypt hash
+	ID       int `json:"id" example:"1"`
+	Username string `json:"username" example:"alice"`
+	Email    string `json:"email" example:"alice@example.com"`
+	Password string `json:"password,omitempty"` // bcrypt hash 
 }
 
 type SearchResult struct {
-	ID       int
-	Language string
-	Content  string
+	ID       int `json:"id" example:"1"`
+	Language string `json:"language" example:"en"`
+	Content  string `json:"content" example:"Sample content"`
 }
 
-// --- main ---
+// SearchResponse represents an API search response
+type SearchResponse struct {
+	SearchResults []SearchResult `json:"search_results"`
+}
+
+// AuthResponse represents a generic auth API response
+type AuthResponse struct {
+	StatusCode int    `json:"statusCode" example:"200"`
+	Message    string `json:"message" example:"Login successful"`
+}
+
+// =====================
+// Main
+// =====================
 
 func main() {
 	port := getenv("PORT", "8080")
@@ -70,17 +99,20 @@ func main() {
 	fs := http.FileServer(http.Dir("static"))
 	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", fs))
 
-	// Pages
+	// Page routes
 	r.HandleFunc("/", SearchPageHandler).Methods("GET")
 	r.HandleFunc("/about", AboutPageHandler).Methods("GET")
 	r.HandleFunc("/login", LoginPageHandler).Methods("GET")
 	r.HandleFunc("/register", RegisterPageHandler).Methods("GET")
 
-	// API
+	// API routes
 	r.HandleFunc("/api/login", APILoginHandler).Methods("POST")
 	r.HandleFunc("/api/register", APIRegisterHandler).Methods("POST")
 	r.HandleFunc("/api/logout", APILogoutHandler).Methods("POST", "GET")
 	r.HandleFunc("/api/search", APISearchHandler).Methods("POST")
+
+	//Swagger documentation route
+	r.PathPrefix("/swagger/").Handler(httpSwagger.WrapHandler)
 
 	fmt.Printf("Server running on :%s\n", port)
 	log.Fatal(http.ListenAndServe(":"+port, r))
@@ -89,6 +121,14 @@ func main() {
 // =====================
 // Page Handlers
 // =====================
+
+// SearchPageHandler godoc
+// @Summary Serve Root Page
+// @Description Returns the search page
+// @Tags Pages
+// @Produce html
+// @Success 200 {string} string "HTML content"
+// @Router / [get]
 
 func SearchPageHandler(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query().Get("q")
@@ -122,18 +162,36 @@ func SearchPageHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// AboutPageHandler godoc
+// @Summary Serve About Page
+// @Tags Pages
+// @Produce html
+// @Success 200 {string} string "HTML content"
+// @Router /about [get]
 func AboutPageHandler(w http.ResponseWriter, r *http.Request) {
 	renderTemplate(w, "about", map[string]any{
 		"Title": "About",
 	})
 }
 
+// LoginPageHandler godoc
+// @Summary Serve Login Page
+// @Tags Pages
+// @Produce html
+// @Success 200 {string} string "HTML content"
+// @Router /login [get]
 func LoginPageHandler(w http.ResponseWriter, r *http.Request) {
 	renderTemplate(w, "login", map[string]any{
 		"Title": "Sign In",
 	})
 }
 
+// RegisterPageHandler godoc
+// @Summary Serve Register Page
+// @Tags Pages
+// @Produce html
+// @Success 200 {string} string "HTML content"
+// @Router /register [get]
 func RegisterPageHandler(w http.ResponseWriter, r *http.Request) {
 	renderTemplate(w, "register", map[string]any{
 		"Title": "Sign Up",
@@ -144,6 +202,16 @@ func RegisterPageHandler(w http.ResponseWriter, r *http.Request) {
 // API Handlers
 // =====================
 
+// APISearchHandler godoc
+// @Summary Search
+// @Description Search for content by query and language
+// @Tags API
+// @Accept json
+// @Produce json
+// @Param q query string true "Search query"
+// @Param language query string false "Language code (e.g., 'en')"
+// @Success 200 {object} SearchResponse
+// @Router /api/search [post]
 func APISearchHandler(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query().Get("q")
 	language := r.URL.Query().Get("language")
@@ -171,6 +239,17 @@ func APISearchHandler(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"search_results": results})
 }
 
+// APILoginHandler godoc
+// @Summary Login
+// @Description Authenticate a user with username and password
+// @Tags API
+// @Accept application/x-www-form-urlencoded
+// @Produce json
+// @Param username formData string true "Username"
+// @Param password formData string true "Password"
+// @Success 200 {object} AuthResponse
+// @Failure 400 {object} AuthResponse
+// @Router /api/login [post]
 func APILoginHandler(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "bad form"})
@@ -200,6 +279,19 @@ func APILoginHandler(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/", http.StatusFound)
 }
 
+// APIRegisterHandler godoc
+// @Summary Register
+// @Description Register a new user
+// @Tags API
+// @Accept application/x-www-form-urlencoded
+// @Produce json
+// @Param username formData string true "Username"
+// @Param email formData string true "Email"
+// @Param password formData string true "Password"
+// @Param password2 formData string false "Password Confirmation"
+// @Success 200 {object} AuthResponse
+// @Failure 400 {object} AuthResponse
+// @Router /api/register [post]
 func APIRegisterHandler(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "bad form"})
@@ -239,6 +331,13 @@ func APIRegisterHandler(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/login", http.StatusFound)
 }
 
+// APILogoutHandler godoc
+// @Summary Logout
+// @Description Log out the current user
+// @Tags API
+// @Produce json
+// @Success 200 {object} AuthResponse
+// @Router /api/logout [get]
 func APILogoutHandler(w http.ResponseWriter, r *http.Request) {
 	sess, _ := sessionStore.Get(r, "session")
 	delete(sess.Values, "user_id")
