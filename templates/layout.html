@@ -1,0 +1,59 @@
+{{define "header"}}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>{{if .Title}}{{.Title}} - {{end}}WhoKnows</title>
+  <link rel="stylesheet" href="/static/style.css"/>
+</head>
+<body>
+  <header class="site-header">
+    <nav class="nav container">
+      <a class="brand" href="/">WhoKnows<span class="dot">?</span></a>
+      <ul class="nav-links">
+        <li><a class="nav-link" href="/?q=">Search</a></li>
+        <li><a class="nav-link" href="/about">About</a></li>
+        <li class="sep"></li>
+        <li><a class="nav-link" href="/login">Login</a></li>
+        <li><a class="btn btn-primary" href="/register">Sign Up</a></li>
+      </ul>
+    </nav>
+  </header>
+  <main class="container content">
+{{end}}
+
+{{define "footer"}}
+  </main>
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <div class="footer-left">
+        <span class="footer-brand">WhoKnows? &copy; {{year}}</span>
+      </div>
+      <ul class="footer-links">
+        <li><a href="/about">About</a></li>
+        <li><a href="/?q=">Search</a></li>
+        <li><a href="/login">Login</a></li>
+      </ul>
+    </div>
+  </footer>
+  <script>
+    let searchInput;
+    document.addEventListener('DOMContentLoaded', () => {
+      searchInput = document.getElementById("search-input");
+      if (searchInput) {
+        searchInput.addEventListener('keypress', (e) => {
+          if (e.key === 'Enter') makeSearchRequest();
+        });
+      }
+    });
+    function makeSearchRequest() {
+      const query = (searchInput && searchInput.value) || '';
+      const url = new URL(window.location.href);
+      url.searchParams.set('q', query);
+      window.location.href = url.toString();
+    }
+  </script>
+</body>
+</html>
+{{end}}
