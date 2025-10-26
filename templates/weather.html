@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>{{.Title}}</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f6f7fb; margin: 50px; }
+    h1 { text-align: center; }
+    .card {
+      background: white;
+      padding: 25px;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      width: 300px;
+      margin: 40px auto;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <h1>{{.Title}}</h1>
+
+  {{if .Forecast}}
+  <div class="card">
+    <p><strong>Step:</strong> {{.Forecast.Properties.Step}}</p>
+    <p><strong>Temperature:</strong> {{printf "%.1f" .Forecast.Properties.Temperature}} K</p>
+    <p><strong>Wind Speed:</strong> {{printf "%.1f" .Forecast.Properties.WindSpeed}} m/s</p>
+    <p><strong>Wind Direction:</strong> {{printf "%.0f" .Forecast.Properties.WindDir}}°</p>
+  </div>
+  {{else}}
+  <p style="text-align:center;">No forecast data found.</p>
+  {{end}}
+</body>
+</html>

@@ -66,6 +66,81 @@ type AuthResponse struct {
 }
 
 // =====================
+// API response structure weather
+// =====================
+
+// Weather response form for weather api
+// @Description Api data structures
+type EDRFeatureCollection struct {
+	Type     string        `json:"type"`
+	Features []EDRFeature  `json:"features"`
+}
+
+type EDRFeature struct {
+	Type       string         `json:"type"`
+	Geometry   EDRGeometry    `json:"geometry"`
+	Properties EDRProperties  `json:"properties"`
+}
+
+type EDRGeometry struct {
+	Type        string      `json:"type"`
+	Coordinates []float64   `json:"coordinates"`
+}
+
+type EDRProperties struct {
+	Temperature float64 `json:"temperature-2m"`
+	WindSpeed   float64 `json:"wind-speed-10m"`
+	WindDir     float64 `json:"wind-dir-10m"`
+	Step        string  `json:"step"`
+}
+
+//Weather data fetch from external api
+func GetCopenhagenForecast() (*EDRFeatureCollection, error) {
+	apiKey := os.Getenv("DMI_API_KEY")
+	if apiKey == "" {
+		return nil, fmt.Errorf("missing DMI_API_KEY environment variable")
+	}
+
+	url := fmt.Sprintf(
+		"https://dmigw.govcloud.dk/v1/forecastedr/collections/harmonie_dini_sf/position"+
+			"?coords=POINT(12.561%%2055.715)&crs=crs84"+
+			"&parameter-name=temperature-2m,wind-speed-10m,wind-dir-10m"+
+			"&f=GeoJSON&api-key=%s", apiKey)
+
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("HTTP request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API returned status: %s", resp.Status)
+	}
+
+	var data EDRFeatureCollection
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		return nil, fmt.Errorf("JSON decode failed: %w", err)
+	}
+
+	return &data, nil
+}
+
+
+//render html template 
+func renderTemplateWeather(w http.ResponseWriter, tmpl string, data any) {
+	t, err := template.ParseFiles(fmt.Sprintf("templates/%s.html", tmpl))
+	if err != nil {
+		http.Error(w, "Template parsing error", http.StatusInternalServerError)
+		log.Println("Template error:", err)
+		return
+	}
+	if err := t.Execute(w, data); err != nil {
+		http.Error(w, "Template execution error", http.StatusInternalServerError)
+		log.Println("Template execution error:", err)
+	}
+}
+
+// =====================
 // Main
 // =====================
 
@@ -104,12 +179,14 @@ func main() {
 	r.HandleFunc("/about", AboutPageHandler).Methods("GET")
 	r.HandleFunc("/login", LoginPageHandler).Methods("GET")
 	r.HandleFunc("/register", RegisterPageHandler).Methods("GET")
+	r.HandleFunc("/weather", WeatherPageHandler).Methods("GET")
 
 	// API routes
 	r.HandleFunc("/api/login", APILoginHandler).Methods("POST")
 	r.HandleFunc("/api/register", APIRegisterHandler).Methods("POST")
 	r.HandleFunc("/api/logout", APILogoutHandler).Methods("POST", "GET")
 	r.HandleFunc("/api/search", APISearchHandler).Methods("POST")
+	
 
 	//Swagger documentation route
 	r.PathPrefix("/swagger/").Handler(httpSwagger.WrapHandler)
@@ -197,6 +274,35 @@ func RegisterPageHandler(w http.ResponseWriter, r *http.Request) {
 		"Title": "Sign Up",
 	})
 }
+
+// WeatherPageHandler godoc
+// @Summary Serve Weather Page
+// @Tags Pages
+// @Produce html
+// @Success 200 {string} string "HTML content"
+// @Router /weather [get]
+
+//Weather web route handler
+func WeatherPageHandler(w http.ResponseWriter, r *http.Request) {
+	data, err := GetCopenhagenForecast()
+	if err != nil {
+		http.Error(w, "Failed to fetch forecast data", http.StatusInternalServerError)
+		log.Println("Forecast fetch error:", err)
+		return
+	}
+
+	// Extract first feature
+	var forecast *EDRFeature
+	if len(data.Features) > 0 {
+		forecast = &data.Features[0]
+	}
+
+	renderTemplateWeather(w, "weather", map[string]any{
+		"Title":    "Copenhagen Forecast",
+		"Forecast": forecast,
+	})
+}
+
 
 // =====================
 // API Handlers
