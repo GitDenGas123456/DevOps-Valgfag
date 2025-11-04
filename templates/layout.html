@@ -1,10 +1,34 @@
+{{define "header"}}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>{{if .Title}}{{.Title}} - {{end}}WhoKnows</title>
+  <link rel="stylesheet" href="/static/style.css"/>
+</head>
+<body>
+  <header class="site-header">
+    <nav class="nav container">
+      <a class="brand" href="/">WhoKnows<span class="dot">?</span></a>
+      <ul class="nav-links">
+        <li><a class="nav-link" href="/?q=">Search</a></li>
+        <li><a class="nav-link" href="/about">About</a></li>
+        <li class="sep"></li>
+        <li><a class="nav-link" href="/login">Login</a></li>
+        <li><a class="btn btn-primary" href="/register">Sign Up</a></li>
+      </ul>
+    </nav>
+  </header>
+  <main class="container content">
+{{end}}
+
 {{define "footer"}}
   </main>
-
   <footer class="site-footer">
     <div class="container footer-inner">
       <div class="footer-left">
-        <span class="footer-brand">¿WhoKnows? © {{now.Year}}</span>
+        <span class="footer-brand">WhoKnows? &copy; {{year}}</span>
       </div>
       <ul class="footer-links">
         <li><a href="/about">About</a></li>
@@ -13,9 +37,7 @@
       </ul>
     </div>
   </footer>
-
   <script>
-    // Search box handling (used on hero search)
     let searchInput;
     document.addEventListener('DOMContentLoaded', () => {
       searchInput = document.getElementById("search-input");
@@ -24,20 +46,7 @@
           if (e.key === 'Enter') makeSearchRequest();
         });
       }
-
-      // Optional subtle parallax for clouds if present
-      const root = document.querySelector('.clouds');
-      if (!root) return;
-      const a = root.querySelector('.layer-a');
-      const b = root.querySelector('.layer-b');
-      const onScroll = () => {
-        const y = window.scrollY || 0;
-        if (a) a.style.transform = `translateY(${y * 0.05}px)`;
-        if (b) b.style.transform = `translateY(${y * 0.08}px)`;
-      };
-      window.addEventListener('scroll', onScroll, { passive: true });
     });
-
     function makeSearchRequest() {
       const query = (searchInput && searchInput.value) || '';
       const url = new URL(window.location.href);
