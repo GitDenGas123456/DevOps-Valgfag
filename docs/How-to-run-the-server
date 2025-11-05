@@ -60,7 +60,7 @@ This setup uses the container image hosted on **GitHub Container Registry (GHCR)
 You need a GitHub token with `write:packages` and `read:packages` permissions.
 
 ```bash
-echo YOUR_GITHUB_TOKEN | sudo docker login ghcr.io -u sebkh123 --password-stdin
+echo YOUR_GITHUB_TOKEN | sudo docker login ghcr.io -u username --password-stdin
 ```
 
 ### 2. Pull the latest image
