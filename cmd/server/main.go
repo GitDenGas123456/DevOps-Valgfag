@@ -94,7 +94,10 @@ func main() {
 	r.HandleFunc("/api/register", h.APIRegisterHandler).Methods("POST")
 	r.HandleFunc("/api/logout", h.APILogoutHandler).Methods("POST", "GET")
 	r.HandleFunc("/api/search", h.APISearchHandler).Methods("POST")
-
+	
+	// Health check
+	r.HandleFunc("/healthz", h.Healthz).Methods(http.MethodGet)
+	
 	r.PathPrefix("/swagger/").Handler(httpSwagger.WrapHandler)
 
 	fmt.Printf("Server running on :%s\n", port)
