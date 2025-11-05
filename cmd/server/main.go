@@ -89,6 +89,7 @@ func main() {
 	r.HandleFunc("/about", h.AboutPageHandler).Methods("GET")
 	r.HandleFunc("/login", h.LoginPageHandler).Methods("GET")
 	r.HandleFunc("/register", h.RegisterPageHandler).Methods("GET")
+	r.HandleFunc("/weather", h.WeatherPageHandler).Methods("GET")
 
 	r.HandleFunc("/api/login", h.APILoginHandler).Methods("POST")
 	r.HandleFunc("/api/register", h.APIRegisterHandler).Methods("POST")
