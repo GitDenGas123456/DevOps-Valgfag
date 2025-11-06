@@ -95,7 +95,7 @@ jobs:
           context: .
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/whoknows-app:latest
+            ghcr.io/gitdengas123456/devops-valgfag:lates
 
   healthz:
     runs-on: ubuntu-latest
