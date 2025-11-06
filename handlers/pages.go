@@ -13,3 +13,4 @@ func LoginPageHandler(w http.ResponseWriter, r *http.Request) {
 func RegisterPageHandler(w http.ResponseWriter, r *http.Request) {
 	renderTemplate(w, "register", map[string]any{"Title": "Sign Up"})
 }
+
