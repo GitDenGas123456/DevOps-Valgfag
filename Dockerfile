@@ -14,12 +14,13 @@ RUN go mod download
 COPY . .
 
 # Byg statisk binær (CGO fri -> nem container)
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o app ./cmd/server
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -p 1 -o app ./cmd/server
+
 
 ############################
 # Runtime (lille image)
 ############################
-FROM gcr.io/distroless/static:nonroot
+FROM alpine:latest
 WORKDIR /app
 
 # Binær + assets
