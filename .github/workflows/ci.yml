@@ -5,6 +5,7 @@ on:
     branches: [ main, master ]
   pull_request:
     branches: [ main, master ]
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -94,4 +95,4 @@ jobs:
           context: .
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/whoknows-app:latest
+            ghcr.io/${{ github.repository_owner,, }}/whoknows-app:latest
