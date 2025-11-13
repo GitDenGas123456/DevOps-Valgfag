@@ -64,9 +64,12 @@ func main() {
 	}
 	defer func() { _ = db.Close() }()
 
-	if getenv("SEED_ON_BOOT", "") == "1" {
+	var tableExists int
+	_ = db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='users'`).Scan(&tableExists)
+	if getenv("SEED_ON_BOOT", "") == "1" || tableExists == 0 {
+		fmt.Println("Seeding database...")
 		if err := dbseed.Seed(db); err != nil {
-			log.Fatal(err)
+			log.Fatal("Failed to seed database:", err)
 		}
 	}
 
