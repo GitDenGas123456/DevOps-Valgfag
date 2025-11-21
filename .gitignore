@@ -13,3 +13,8 @@ venv/
 *.swp
 
 legacy
+# sqlite seed
+/data/seed/*.db
+
+# sqlite seed
+/data/seed/*.db

@@ -1,0 +1,25 @@
+{{ define "weather" }}
+<!DOCTYPE html>
+<html>
+<head>
+  <title>{{ .Title }}</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <h1>{{ .Title }}</h1>
+
+  {{ if .Error }}
+    <p style="color:red;">Error fetching forecast: {{ .Error }}</p>
+  {{ else if .Forecast }}
+    <p>Temperature: {{ .Forecast.Properties.Temperature }} °C</p>
+    <p>Wind Speed: {{ .Forecast.Properties.WindSpeed }} m/s</p>
+    <p>Wind Direction: {{ .Forecast.Properties.WindDir }}°</p>
+    <p>Step: {{ .Forecast.Properties.Step }}</p>
+  {{ else }}
+    <p>No forecast data available.</p>
+  {{ end }}
+
+  <a href="/">Back</a>
+</body>
+</html>
+{{ end }}

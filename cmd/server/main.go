@@ -64,9 +64,12 @@ func main() {
 	}
 	defer func() { _ = db.Close() }()
 
-	if getenv("SEED_ON_BOOT", "") == "1" {
+	var tableExists int
+	_ = db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='users'`).Scan(&tableExists)
+	if getenv("SEED_ON_BOOT", "") == "1" || tableExists == 0 {
+		fmt.Println("Seeding database...")
 		if err := dbseed.Seed(db); err != nil {
-			log.Fatal(err)
+			log.Fatal("Failed to seed database:", err)
 		}
 	}
 
@@ -89,11 +92,15 @@ func main() {
 	r.HandleFunc("/about", h.AboutPageHandler).Methods("GET")
 	r.HandleFunc("/login", h.LoginPageHandler).Methods("GET")
 	r.HandleFunc("/register", h.RegisterPageHandler).Methods("GET")
+	r.HandleFunc("/weather", h.WeatherPageHandler).Methods("GET")
 
 	r.HandleFunc("/api/login", h.APILoginHandler).Methods("POST")
 	r.HandleFunc("/api/register", h.APIRegisterHandler).Methods("POST")
 	r.HandleFunc("/api/logout", h.APILogoutHandler).Methods("POST", "GET")
 	r.HandleFunc("/api/search", h.APISearchHandler).Methods("POST")
+
+	// Health check
+	r.HandleFunc("/healthz", h.Healthz).Methods(http.MethodGet)
 
 	r.PathPrefix("/swagger/").Handler(httpSwagger.WrapHandler)
 

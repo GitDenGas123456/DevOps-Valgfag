@@ -1,0 +1,16 @@
+version: "3.9"
+
+services:
+  whoknows-app:
+    build: .
+    container_name: whoknows-app
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - DATABASE_PATH=/app/data/seed/whoknows.db
+      - SEED_ON_BOOT=1   # Only needed the first time to seed data
+    volumes:
+      # Mount a local folder to persist database data
+      - ./data:/app/data
+    restart: unless-stopped
