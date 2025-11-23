@@ -102,6 +102,11 @@ func main() {
 	// Health check
 	r.HandleFunc("/healthz", h.Healthz).Methods(http.MethodGet)
 
+	
+	// Metrics endpoint 
+	r.Handle("/metrics", promhttp.Handler())
+
+
 	r.PathPrefix("/swagger/").Handler(httpSwagger.WrapHandler)
 
 	fmt.Printf("Server running on :%s\n", port)
