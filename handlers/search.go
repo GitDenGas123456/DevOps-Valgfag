@@ -1,5 +1,6 @@
 package handlers
 
+//Imports
 import (
 	"net/http"
 )
@@ -55,6 +56,7 @@ func APISearchHandler(w http.ResponseWriter, r *http.Request) {
 		language = "en"
 	}
 
+	// fetches results compared to search word
 	var results []SearchResult
 	if q != "" {
 		rows, err := db.Query(
@@ -63,6 +65,8 @@ func APISearchHandler(w http.ResponseWriter, r *http.Request) {
 			 WHERE language = ? AND (title LIKE ? OR content LIKE ?)`,
 			language, "%"+q+"%", "%"+q+"%",
 		)
+
+		// Error catch for no result
 		if err == nil {
 			defer func() { _ = rows.Close() }()
 			for rows.Next() {
@@ -74,5 +78,6 @@ func APISearchHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Return search result through JSON
 	writeJSON(w, http.StatusOK, map[string]any{"search_results": results})
 }
