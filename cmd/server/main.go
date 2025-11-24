@@ -57,12 +57,24 @@ func main() {
 		log.Fatal(err)
 	}
 	sessionKey := getenv("SESSION_KEY", "development key")
+	useFTS := getenv("SEARCH_FTS", "")
 
 	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer func() { _ = db.Close() }()
+
+	// SQLite tuning for concurrency and stability
+	if _, err := db.Exec(`PRAGMA journal_mode=WAL;`); err != nil {
+		log.Printf("PRAGMA journal_mode=WAL failed: %v", err)
+	}
+	if _, err := db.Exec(`PRAGMA synchronous=NORMAL;`); err != nil {
+		log.Printf("PRAGMA synchronous=NORMAL failed: %v", err)
+	}
+	if _, err := db.Exec(`PRAGMA busy_timeout=5000;`); err != nil {
+		log.Printf("PRAGMA busy_timeout failed: %v", err)
+	}
 
 	var tableExists int
 	_ = db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='users'`).Scan(&tableExists)
@@ -82,6 +94,12 @@ func main() {
 	sessionStore := sessions.NewCookieStore([]byte(sessionKey))
 
 	h.Init(db, tmpl, sessionStore)
+
+	if useFTS == "1" {
+		h.EnableFTSSearch(true)
+	} else {
+		h.EnableFTSSearch(false)
+	}
 
 	r := mux.NewRouter()
 
