@@ -14,14 +14,15 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/gorilla/mux"
-	"github.com/gorilla/sessions"
-	httpSwagger "github.com/swaggo/http-swagger"
-	_ "modernc.org/sqlite"
-
 	_ "devops-valgfag/docs"
 	h "devops-valgfag/handlers"
 	dbseed "devops-valgfag/internal/db"
+
+	"github.com/gorilla/mux"
+	"github.com/gorilla/sessions"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	httpSwagger "github.com/swaggo/http-swagger"
+	_ "modernc.org/sqlite"
 )
 
 // User represents an application user
@@ -120,10 +121,8 @@ func main() {
 	// Health check
 	r.HandleFunc("/healthz", h.Healthz).Methods(http.MethodGet)
 
-	
-	// Metrics endpoint 
+	// Metrics endpoint
 	r.Handle("/metrics", promhttp.Handler())
-
 
 	r.PathPrefix("/swagger/").Handler(httpSwagger.WrapHandler)
 
