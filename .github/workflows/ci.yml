@@ -122,7 +122,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y sqlite3
 
       - name: Prepare fresh DB path
-        run: mkdir -p data/seed && : > data/seed/whoknows.db
+        run: mkdir -p data/seed && :> data/seed/whoknows.db
 
       - name: Run migration check
         run: make migrate.check
