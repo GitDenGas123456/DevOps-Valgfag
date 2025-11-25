@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main, master, develop ]
   pull_request:
-    branches: [ main, master ]
+    branches: [ main, master, develop ]
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -70,13 +70,69 @@ jobs:
         uses: hadolint/hadolint-action@v3.1.0
         with:
           dockerfile: Dockerfile
+
+  healthz:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.x'
+          check-latest: true
+          cache: true
+
+      - name: Build server
+        run: go build ./cmd/server
+
+      - name: Start server
+        run: |
+          nohup go run ./cmd/server > app.log 2>&1 &
+          echo $! > app.pid
+          sleep 2
+
+      - name: Smoke test /healthz
+        run: scripts/smoke.sh
+
+      - name: Stop server & upload logs
+        if: always()
+        run: |
+          if [ -f app.pid ]; then kill "$(cat app.pid)" || true; fi
+          sleep 1
+        shell: bash
+
+      - name: Upload app.log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-log
+          path: app.log
+
+  migrations-check:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install sqlite3
+        run: sudo apt-get update && sudo apt-get install -y sqlite3
+
+      - name: Prepare fresh DB path
+        run: mkdir -p data/seed && :> data/seed/whoknows.db
+
+      - name: Run migration check
+        run: make migrate.check
+
   docker-build:
-    needs: [build, hadolint]
+    needs: [build, hadolint, healthz, migrations-check]
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -94,4 +150,4 @@ jobs:
           context: .
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/whoknows-app:latest
+            ghcr.io/gitdengas123456/devops-valgfag:latest

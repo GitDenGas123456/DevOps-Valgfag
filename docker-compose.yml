@@ -1,0 +1,36 @@
+version: "3.9"
+
+services:
+  whoknows-app:
+    image: ghcr.io/gitdengas123456/devops-valgfag:latest
+    container_name: whoknows-app
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - DATABASE_PATH=/app/data/seed/whoknows.db
+      - SEED_ON_BOOT=1   # Only needed the first time to seed data
+    volumes:
+      # Mount a local folder to persist database data
+      - ./data:/app/data
+    restart: unless-stopped
+
+     prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    depends_on:
+      - whoknows-app
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    restart: unless-stopped
