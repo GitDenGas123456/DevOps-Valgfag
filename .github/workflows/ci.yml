@@ -122,9 +122,18 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y sqlite3
 
       - name: Prepare fresh DB path
-        run: mkdir -p data/seed && :> data/seed/whoknows.db
+        run: |
+          mkdir -p data/seed
+          : > data/seed/whoknows.db
+
+      - name: Run migrations
+        env:
+          DATABASE_PATH: data/seed/whoknows.db
+        run: make migrate
 
       - name: Run migration check
+        env:
+          DATABASE_PATH: data/seed/whoknows.db
         run: make migrate.check
 
   docker-build:
