@@ -52,14 +52,20 @@ type AuthResponse struct {
 }
 
 func main() {
+	// Set port
 	port := getenv("PORT", "8080")
+
+	// Path for database
 	dbPath := getenv("DATABASE_PATH", "data/seed/whoknows.db")
 	if err := os.MkdirAll(filepath.Dir(dbPath), 0o755); err != nil {
 		log.Fatal(err)
 	}
+
+	// Session key + FTS flag
 	sessionKey := getenv("SESSION_KEY", "development key")
 	useFTS := getenv("SEARCH_FTS", "")
 
+	// Open DB
 	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		log.Fatal(err)
@@ -77,6 +83,7 @@ func main() {
 		log.Printf("PRAGMA busy_timeout failed: %v", err)
 	}
 
+	// Seed DB if needed
 	var tableExists int
 	_ = db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='users'`).Scan(&tableExists)
 	if getenv("SEED_ON_BOOT", "") == "1" || tableExists == 0 {
@@ -86,33 +93,40 @@ func main() {
 		}
 	}
 
+	// Templates
 	funcs := template.FuncMap{
 		"now":  time.Now,
 		"year": func() int { return time.Now().Year() },
 	}
 	tmpl := template.Must(template.New("").Funcs(funcs).ParseGlob("./templates/*.html"))
 
+	// Session cookies
 	sessionStore := sessions.NewCookieStore([]byte(sessionKey))
 
 	h.Init(db, tmpl, sessionStore)
 
+	// Toggle FTS
 	if useFTS == "1" {
 		h.EnableFTSSearch(true)
 	} else {
 		h.EnableFTSSearch(false)
 	}
 
+	// Router
 	r := mux.NewRouter()
 
+	// Static files
 	fs := http.FileServer(http.Dir("static"))
 	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", fs))
 
+	// Page endpoints
 	r.HandleFunc("/", h.SearchPageHandler).Methods("GET")
 	r.HandleFunc("/about", h.AboutPageHandler).Methods("GET")
 	r.HandleFunc("/login", h.LoginPageHandler).Methods("GET")
 	r.HandleFunc("/register", h.RegisterPageHandler).Methods("GET")
 	r.HandleFunc("/weather", h.WeatherPageHandler).Methods("GET")
 
+	// API endpoints
 	r.HandleFunc("/api/login", h.APILoginHandler).Methods("POST")
 	r.HandleFunc("/api/register", h.APIRegisterHandler).Methods("POST")
 	r.HandleFunc("/api/logout", h.APILogoutHandler).Methods("POST", "GET")
@@ -124,8 +138,10 @@ func main() {
 	// Metrics endpoint
 	r.Handle("/metrics", promhttp.Handler())
 
+	// Swagger
 	r.PathPrefix("/swagger/").Handler(httpSwagger.WrapHandler)
 
+	// Start server
 	fmt.Printf("Server running on :%s\n", port)
 	log.Fatal(http.ListenAndServe(":"+port, r))
 }

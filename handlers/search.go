@@ -99,6 +99,7 @@ LIMIT ? OFFSET ?;`
 			 WHERE language = ? AND (title LIKE ? OR content LIKE ?)`,
 				language, "%"+q+"%", "%"+q+"%",
 			)
+			// Error catch for no result
 			if err == nil {
 				defer func() { _ = rows.Close() }()
 				for rows.Next() {
