@@ -20,7 +20,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -p 1 -o app ./cmd/server
 ############################
 # Runtime (lille image)
 ############################
-FROM alpine:latest
+FROM alpine:3.20
 WORKDIR /app
 
 # Binær + assets
