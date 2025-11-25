@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main, master, develop ]
   pull_request:
-    branches: [ main, master ]
+    branches: [ main, master, develop ]
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -92,7 +92,7 @@ jobs:
         run: |
           nohup go run ./cmd/server > app.log 2>&1 &
           echo $! > app.pid
-          sleep 2   # give it a moment to boot
+          sleep 2
 
       - name: Smoke test /healthz
         run: scripts/smoke.sh
