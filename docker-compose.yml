@@ -15,7 +15,7 @@ services:
       - ./data:/app/data
     restart: unless-stopped
 
-     prometheus:
+  prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
     ports:
