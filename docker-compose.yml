@@ -9,13 +9,12 @@ services:
     environment:
       - PORT=8080
       - DATABASE_PATH=/app/data/seed/whoknows.db
-      - SEED_ON_BOOT=1   # Only needed the first time to seed data
+      - SEED_ON_BOOT=1
     volumes:
-      # Mount a local folder to persist database data
       - ./data:/app/data
     restart: unless-stopped
 
-     prometheus:
+  prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
     ports:
