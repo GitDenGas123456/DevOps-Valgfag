@@ -169,12 +169,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # Secrets required: SSH_HOST (e.g. 4.235.104.246), SSH_USER (adminuser), SSH_KEY (private key with VM access)
       - name: Deploy to VM via SSH
         uses: appleboy/ssh-action@v1.1.0
         with:
-          host: ${{ vars.PROD_SSH_HOST }}
-          username: ${{ vars.PROD_SSH_USER }}
-          key: ${{ secrets.PROD_SSH_KEY }}
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: 22
           script: |
             docker pull ${{ vars.IMAGE }}
             docker compose -f ~/DevOps-Valgfag/docker-compose.yml down || true
