@@ -160,3 +160,23 @@ jobs:
           push: true
           tags: |
             ghcr.io/gitdengas123456/devops-valgfag:latest
+  deploy:
+    needs: docker-build
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to VM via SSH
+        uses: appleboy/ssh-action@v1.1.0
+        with:
+          host: ${{ vars.PROD_SSH_HOST }}
+          username: ${{ vars.PROD_SSH_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          script: |
+            docker pull ${{ vars.IMAGE }}
+            docker compose -f ~/DevOps-Valgfag/docker-compose.yml down || true
+            docker compose -f ~/DevOps-Valgfag/docker-compose.yml up -d
+
