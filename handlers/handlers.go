@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"html/template"
 	"net/http"
+	"os"
 
 	"github.com/gorilla/sessions"
 )
@@ -45,4 +46,15 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(v)
+}
+
+// SeedDB loads schema.sql into the given DB
+func SeedDB(db *sql.DB) error {
+	// Use project-root relative path
+	raw, err := os.ReadFile("../internal/db/schema.sql") // <- adjust as needed
+	if err != nil {
+		return err
+	}
+	_, err = db.Exec(string(raw))
+	return err
 }
