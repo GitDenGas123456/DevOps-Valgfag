@@ -62,7 +62,11 @@ func setupTestServer(t *testing.T) (*mux.Router, *sql.DB) {
 
 func TestIntegration_RegisterLoginSearch(t *testing.T) {
 	router, db := setupTestServer(t)
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Errorf("failed to close db: %v", err)
+		}
+	}()
 
 	// 1. Register a new user
 	form := url.Values{}
