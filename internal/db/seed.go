@@ -1,5 +1,6 @@
 package db
 
+// Imports
 import (
 	"bufio"
 	"bytes"
@@ -17,6 +18,7 @@ func Seed(database *sql.DB) error {
 		return nil
 	}
 
+	
 	scanner := bufio.NewScanner(bytes.NewReader(raw))
 	var b strings.Builder
 	for scanner.Scan() {

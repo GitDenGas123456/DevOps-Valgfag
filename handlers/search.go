@@ -4,6 +4,13 @@ import (
 	"net/http"
 )
 
+var useFTSSearch bool
+
+// EnableFTSSearch toggles FTS usage for search endpoints.
+func EnableFTSSearch(on bool) {
+	useFTSSearch = on
+}
+
 // SearchResult represents a single search result row
 type SearchResult struct {
 	ID          int
@@ -57,18 +64,49 @@ func APISearchHandler(w http.ResponseWriter, r *http.Request) {
 
 	var results []SearchResult
 	if q != "" {
-		rows, err := db.Query(
-			`SELECT id, title, url, language, content
+		const limit = 10
+		const offset = 0
+
+		if useFTSSearch {
+			// FTS-powered search when enabled
+			ftsQuery := `
+SELECT p.id,
+       p.title,
+       p.url,
+       p.language,
+       p.content,
+       bm25(pages_fts) AS rank
+FROM pages_fts
+JOIN pages p ON p.id = pages_fts.rowid
+WHERE p.language = ? AND pages_fts MATCH ?
+ORDER BY rank ASC
+LIMIT ? OFFSET ?;`
+			rows, err := db.Query(ftsQuery, language, q, limit, offset)
+			if err == nil {
+				defer func() { _ = rows.Close() }()
+				for rows.Next() {
+					var it SearchResult
+					var rank float64
+					if err := rows.Scan(&it.ID, &it.Title, &it.URL, &it.Language, &it.Description, &rank); err == nil {
+						results = append(results, it)
+					}
+				}
+			}
+		} else {
+			rows, err := db.Query(
+				`SELECT id, title, url, language, content
 			 FROM pages
 			 WHERE language = ? AND (title LIKE ? OR content LIKE ?)`,
-			language, "%"+q+"%", "%"+q+"%",
-		)
-		if err == nil {
-			defer func() { _ = rows.Close() }()
-			for rows.Next() {
-				var it SearchResult
-				if err := rows.Scan(&it.ID, &it.Title, &it.URL, &it.Language, &it.Description); err == nil {
-					results = append(results, it)
+				language, "%"+q+"%", "%"+q+"%",
+			)
+			// Error catch for no result
+			if err == nil {
+				defer func() { _ = rows.Close() }()
+				for rows.Next() {
+					var it SearchResult
+					if err := rows.Scan(&it.ID, &it.Title, &it.URL, &it.Language, &it.Description); err == nil {
+						results = append(results, it)
+					}
 				}
 			}
 		}

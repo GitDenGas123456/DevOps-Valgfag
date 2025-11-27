@@ -1,14 +1,17 @@
 package handlers
 
+// Imports
 import (
 	"database/sql"
 	"encoding/json"
 	"html/template"
 	"net/http"
+	"os"
 
 	"github.com/gorilla/sessions"
 )
 
+// values for database, template and session/cookies
 var (
 	db           *sql.DB
 	tmpl         *template.Template
@@ -22,7 +25,10 @@ func Init(database *sql.DB, templates *template.Template, store *sessions.Cookie
 	sessionStore = store
 }
 
+// renders template
 func renderTemplate(w http.ResponseWriter, name string, data map[string]any) {
+	
+	// Header
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if data == nil {
 		data = map[string]any{}
@@ -35,8 +41,20 @@ func renderTemplate(w http.ResponseWriter, name string, data map[string]any) {
 	}
 }
 
+// function parsing string to JSON
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(v)
+}
+
+// SeedDB loads schema.sql into the given DB
+func SeedDB(db *sql.DB) error {
+	// Use project-root relative path
+	raw, err := os.ReadFile("../internal/db/schema.sql") // <- adjust as needed
+	if err != nil {
+		return err
+	}
+	_, err = db.Exec(string(raw))
+	return err
 }

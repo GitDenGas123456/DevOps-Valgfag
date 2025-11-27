@@ -34,5 +34,5 @@ ENV DATABASE_PATH=/app/data/seed/whoknows.db
 
 # Appen opretter selv /app/data/seed ved runtime
 EXPOSE 8080
-USER nonroot:nonroot
+#USER nonroot:nonroot remove for compose
 ENTRYPOINT ["/app/app"]

@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main, master, develop ]
   pull_request:
-    branches: [ main, master ]
+    branches: [ main, master, develop ]
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -92,7 +92,7 @@ jobs:
         run: |
           nohup go run ./cmd/server > app.log 2>&1 &
           echo $! > app.pid
-          sleep 2   # give it a moment to boot
+          sleep 2
 
       - name: Smoke test /healthz
         run: scripts/smoke.sh
@@ -122,9 +122,18 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y sqlite3
 
       - name: Prepare fresh DB path
-        run: mkdir -p data/seed && : > data/seed/whoknows.db
+        run: |
+          mkdir -p data/seed
+          : > data/seed/whoknows.db
+
+      - name: Run migrations
+        env:
+          DATABASE_PATH: data/seed/whoknows.db
+        run: make migrate
 
       - name: Run migration check
+        env:
+          DATABASE_PATH: data/seed/whoknows.db
         run: make migrate.check
 
   docker-build:
@@ -151,3 +160,23 @@ jobs:
           push: true
           tags: |
             ghcr.io/gitdengas123456/devops-valgfag:latest
+  deploy:
+    needs: docker-build
+    runs-on: ubuntu-latest
+    environment: produktion
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to VM via SSH
+        uses: appleboy/ssh-action@v1.1.0
+        with:
+          host: ${{ vars.PROD_SSH_HOST }}
+          username: ${{ vars.PROD_SSH_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          script: |
+            docker pull ${{ vars.IMAGE }}
+            docker compose -f ~/DevOps-Valgfag/docker-compose.yml down || true
+            docker compose -f ~/DevOps-Valgfag/docker-compose.yml up -d
+
