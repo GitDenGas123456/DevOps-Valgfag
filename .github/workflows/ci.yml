@@ -43,7 +43,10 @@ jobs:
           args: ./...
 
       - name: Run tests
-        run: go test -v -race ./... -coverprofile=coverage.out
+        run: |
+          go test -v -race ./tests \
+            -coverpkg=./cmd/server,./handlers,./internal/db \
+            -coverprofile=coverage.out
 
       - name: Show coverage summary
         if: ${{ always() && hashFiles('coverage.out') != '' }}
