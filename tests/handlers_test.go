@@ -1,26 +1,26 @@
-package handlers
+package tests
 
 import (
 	"database/sql"
 	"html/template"
 	"testing"
 
+	h "devops-valgfag/handlers"
 	"github.com/gorilla/sessions"
 	_ "modernc.org/sqlite"
 )
 
-// setupTestHandlers laver en test-db, templates og session store,
-// og kalder Init, så handlers er klar til brug i tests.
+// setupTestHandlers creates an in-memory DB, templates, and session store, then wires handlers.Init.
 func setupTestHandlers(t *testing.T) *sql.DB {
 	t.Helper()
 
-	// In-memory SQLite (kun i RAM, forsvinder efter test)
+	// In-memory SQLite (only in RAM; disappears after the test)
 	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("failed to open in-memory sqlite: %v", err)
 	}
 
-	// Minimal schema (samme som migrations/0001_create_core_tables.sql)
+	// Minimal schema (mirrors migrations/0001_create_core_tables.sql)
 	schema := `
 CREATE TABLE IF NOT EXISTS users (
   id        INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS pages (
 		t.Fatalf("failed to create schema: %v", err)
 	}
 
-	// Enkle templates – bare tekst, ikke rigtige html-filer.
+	// Simple templates for tests (no real HTML files).
 	tmpl := template.Must(template.New("base").Parse(`
 {{define "search"}}search page {{.Query}}{{end}}
 {{define "search.html"}}search page {{.Query}}{{end}}
@@ -57,8 +57,8 @@ CREATE TABLE IF NOT EXISTS pages (
 	// Test session store
 	store := sessions.NewCookieStore([]byte("test-session-key"))
 
-	// Init fra handlers/handlers.go – samme som main gør
-	Init(db, tmpl, store)
+	// Init from handlers/handlers.go (same as main)
+	h.Init(db, tmpl, store)
 
 	return db
 }
