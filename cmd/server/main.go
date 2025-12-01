@@ -17,6 +17,7 @@ import (
 	_ "devops-valgfag/docs"
 	h "devops-valgfag/handlers"
 	dbseed "devops-valgfag/internal/db"
+	metrics "devops-valgfag/internal/metrics"
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/sessions"
@@ -114,6 +115,7 @@ func main() {
 
 	// Router
 	r := mux.NewRouter()
+	r.Use(metrics.RequestMetricsMiddleware())
 
 	// Static files
 	fs := http.FileServer(http.Dir("static"))

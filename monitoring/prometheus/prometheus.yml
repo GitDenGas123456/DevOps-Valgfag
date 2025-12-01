@@ -2,7 +2,22 @@ global:
   scrape_interval: 5s
 
 scrape_configs:
+  # Go app (whoknows-app container)
   - job_name: "whoknows-app"
+    metrics_path: /metrics
     static_configs:
-      - targets: ["whoknows-app:8080"]
+      - targets:
+          - "whoknows-app:8080"
+
+  # Node exporter for host/container metrics
+  - job_name: "node_exporter"
+    static_configs:
+      - targets:
+          - "node_exporter:9100"
+
+  # Prometheus self-scrape
+  - job_name: "prometheus"
+    static_configs:
+      - targets:
+          - "localhost:9090"
 

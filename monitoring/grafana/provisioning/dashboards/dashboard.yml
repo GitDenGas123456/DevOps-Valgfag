@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: Search Monitoring
+    uid: search-monitoring
+    type: file
+    allowUiUpdates: false
+    disableDeletion: true
+    updateIntervalSeconds: 30
+    options:
+      path: /var/lib/grafana/dashboards
