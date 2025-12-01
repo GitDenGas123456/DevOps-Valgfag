@@ -1,5 +1,3 @@
-
-
 name: CI
 
 on:
@@ -46,7 +44,7 @@ jobs:
 
       - name: Run tests
         run: |
-          go test -v -race ./tests \
+          go test -v -race ./... \
             -coverpkg=./cmd/server,./handlers,./internal/db \
             -coverprofile=coverage.out
 
@@ -187,10 +185,3 @@ jobs:
             docker pull ${{ vars.IMAGE }}
             docker compose -f ~/DevOps-Valgfag/docker-compose.yml down || true
             docker compose -f ~/DevOps-Valgfag/docker-compose.yml up -d
-
-
-
-
-
-
-
