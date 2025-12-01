@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"html/template"
+	"log"
 	"net/http"
 
 	"github.com/gorilla/sessions"
@@ -30,8 +31,12 @@ func renderTemplate(w http.ResponseWriter, name string, data map[string]any) {
 	if _, ok := data["Title"]; !ok {
 		data["Title"] = ""
 	}
-	if err := tmpl.ExecuteTemplate(w, name, data); err != nil {
-		http.Error(w, "template exec error: "+err.Error(), http.StatusInternalServerError)
+
+	// Execute template
+	err := tmpl.ExecuteTemplate(w, name, data)
+	if err != nil {
+		// Cannot safely call http.Error if template wrote some content
+		log.Println("template exec error:", err)
 	}
 }
 
