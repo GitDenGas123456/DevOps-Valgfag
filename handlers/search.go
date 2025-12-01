@@ -47,7 +47,7 @@ func SearchPageHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	renderTemplate(w, "search", map[string]any{
+	renderTemplate(w, r, "search", map[string]any{
 		"Title":   "Search",
 		"Query":   q,
 		"Results": results,

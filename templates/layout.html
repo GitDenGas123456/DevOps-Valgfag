@@ -15,8 +15,16 @@
         <li><a class="nav-link" href="/?q=">Search</a></li>
         <li><a class="nav-link" href="/about">About</a></li>
         <li class="sep"></li>
-        <li><a class="nav-link" href="/login">Login</a></li>
-        <li><a class="btn btn-primary" href="/register">Sign Up</a></li>
+        {{if .LoggedIn}}
+          <li>
+            <form action="/api/logout" method="POST" style="display:inline;">
+              <button class="nav-link" type="submit" style="border:none;background:none;padding:0;">Logout</button>
+            </form>
+          </li>
+        {{else}}
+          <li><a class="nav-link" href="/login">Login</a></li>
+          <li><a class="btn btn-primary" href="/register">Sign Up</a></li>
+        {{end}}
       </ul>
     </nav>
   </header>
@@ -33,7 +41,15 @@
       <ul class="footer-links">
         <li><a href="/about">About</a></li>
         <li><a href="/?q=">Search</a></li>
-        <li><a href="/login">Login</a></li>
+        {{if .LoggedIn}}
+          <li>
+            <form action="/api/logout" method="POST" style="display:inline;">
+              <button type="submit" class="nav-link" style="border:none;background:none;padding:0;">Logout</button>
+            </form>
+          </li>
+        {{else}}
+          <li><a href="/login">Login</a></li>
+        {{end}}
       </ul>
     </div>
   </footer>
