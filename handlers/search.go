@@ -61,7 +61,7 @@ func SearchPageHandler(w http.ResponseWriter, r *http.Request) {
 		metrics.SearchWithResult.Inc()
 	}
 
-	renderTemplate(w, "search", map[string]any{
+	renderTemplate(w, r, "search", map[string]any{
 		"Title":   "Search",
 		"Query":   q,
 		"Results": results,
@@ -137,5 +137,7 @@ LIMIT ? OFFSET ?;`
 		metrics.SearchWithResult.Inc()
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{"search_results": results})
+	writeJSON(w, http.StatusOK, map[string]any{
+		"search_results": results,
+	})
 }

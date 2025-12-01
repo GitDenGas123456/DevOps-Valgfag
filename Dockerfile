@@ -28,6 +28,8 @@ COPY --from=build /app/app /app/app
 COPY --from=build /app/templates /app/templates
 COPY --from=build /app/static /app/static
 
+COPY --from=build /app/internal/db /app/internal/db
+
 # Miljøvariabler (main.go læser disse)
 ENV PORT=8080
 ENV DATABASE_PATH=/app/data/seed/whoknows.db
