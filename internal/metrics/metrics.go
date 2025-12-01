@@ -47,7 +47,7 @@ func RequestMetricsMiddleware() mux.MiddlewareFunc {
 
 			path := r.URL.Path
 			if route := mux.CurrentRoute(r); route != nil {
-				if tmpl, err := route.GetPathTemplate(); err == nil {
+				if tmpl, _ := route.GetPathTemplate(); tmpl != "" {
 					path = tmpl
 				}
 			}
