@@ -84,6 +84,9 @@ body{
 
 /* Content spacing */
 .content{padding:28px 0 64px}
+.content > .hero-bleed:first-child{
+  margin-top:-28px; /* pull hero up to touch the header */
+}
 
 /* ===== Full-bleed HERO (blue sky + clouds) ===== */
 .hero-bleed{
@@ -93,9 +96,11 @@ body{
   width: 100vw;
   overflow: hidden;
   background: #a7c7ff; /* sky */
-  border-bottom: 1px solid var(--hairline);
 }
-.clouds{ position: absolute; inset: 0; z-index: 1; }
+.clouds{
+  position: absolute; inset: 0; z-index: 1;
+  bottom: -12px; /* let clouds hang past bottom to avoid showing the edge */
+}
 .cloud{
   position: absolute; top: 0; left: 0;
   width: 200%; height: 100%;
