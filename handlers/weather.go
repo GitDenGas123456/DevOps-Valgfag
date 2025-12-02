@@ -90,7 +90,7 @@ func WeatherPageHandler(w http.ResponseWriter, r *http.Request) {
 		forecast = &data.Features[0]
 	}
 
-	renderTemplate(w, "weather", map[string]any{
+	renderTemplate(w, r, "weather", map[string]any{
 		"Title":    "Copenhagen Forecast",
 		"Forecast": forecast,
 		"Error":    errorMessage,

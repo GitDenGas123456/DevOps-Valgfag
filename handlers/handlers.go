@@ -26,8 +26,8 @@ func Init(database *sql.DB, templates *template.Template, store *sessions.Cookie
 }
 
 // renders template
-func renderTemplate(w http.ResponseWriter, name string, data map[string]any) {
-	
+func renderTemplate(w http.ResponseWriter, r *http.Request, name string, data map[string]any) {
+
 	// Header
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if data == nil {
@@ -36,9 +36,22 @@ func renderTemplate(w http.ResponseWriter, name string, data map[string]any) {
 	if _, ok := data["Title"]; !ok {
 		data["Title"] = ""
 	}
+	data["LoggedIn"] = isAuthenticated(r)
 	if err := tmpl.ExecuteTemplate(w, name, data); err != nil {
 		http.Error(w, "template exec error: "+err.Error(), http.StatusInternalServerError)
 	}
+}
+
+func isAuthenticated(r *http.Request) bool {
+	if sessionStore == nil {
+		return false
+	}
+	sess, err := sessionStore.Get(r, "session")
+	if err != nil {
+		return false
+	}
+	_, ok := sess.Values["user_id"]
+	return ok
 }
 
 // function parsing string to JSON

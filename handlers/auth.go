@@ -37,12 +37,12 @@ func APILoginHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Error catch if username not found in database
 	if err != nil {
-		renderTemplate(w, "login", map[string]any{"Title": "Sign In", "error": "Invalid username"})
+		renderTemplate(w, r, "login", map[string]any{"Title": "Sign In", "error": "Invalid username"})
 		return
 	}
 	// Error catch if hashed password not found in database
 	if bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(password)) != nil {
-		renderTemplate(w, "login", map[string]any{"Title": "Sign In", "error": "Invalid password", "username": username})
+		renderTemplate(w, r, "login", map[string]any{"Title": "Sign In", "error": "Invalid password", "username": username})
 		return
 	}
 
@@ -69,13 +69,13 @@ func APIRegisterHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Error catch for possible empty fields when trying to register
 	if username == "" || email == "" || pw1 == "" {
-		renderTemplate(w, "register", map[string]any{"Title": "Sign Up", "error": "All fields required"})
+		renderTemplate(w, r, "register", map[string]any{"Title": "Sign Up", "error": "All fields required"})
 		return
 	}
 
 	// Error catch for non matching passwords in registration
 	if pw1 != pw2 {
-		renderTemplate(w, "register", map[string]any{"Title": "Sign Up", "error": "Password do not match"})
+		renderTemplate(w, r, "register", map[string]any{"Title": "Sign Up", "error": "Password do not match"})
 		return
 	}
 
@@ -83,7 +83,7 @@ func APIRegisterHandler(w http.ResponseWriter, r *http.Request) {
 	var exists int
 	_ = db.QueryRow(`SELECT COUNT(*) FROM users WHERE username = ?`, username).Scan(&exists)
 	if exists > 0 {
-		renderTemplate(w, "register", map[string]any{"Title": "Sign Up", "error": "Registration failed, Username already in use"})
+		renderTemplate(w, r, "register", map[string]any{"Title": "Sign Up", "error": "Registration failed, Username already in use"})
 		return
 	}
 
@@ -95,7 +95,7 @@ func APIRegisterHandler(w http.ResponseWriter, r *http.Request) {
 		`INSERT INTO users (username, email, password) VALUES (?, ?, ?)`,
 		username, email, string(hash),
 	); err != nil {
-		renderTemplate(w, "register", map[string]any{"Title": "Sign Up", "error": "Registration failed"})
+		renderTemplate(w, r, "register", map[string]any{"Title": "Sign Up", "error": "Registration failed"})
 		return
 	}
 
