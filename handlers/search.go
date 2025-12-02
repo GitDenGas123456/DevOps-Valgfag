@@ -2,6 +2,9 @@ package handlers
 
 import (
 	"net/http"
+
+	"devops-valgfag/internal/metrics"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 var useFTSSearch bool
@@ -23,6 +26,13 @@ type SearchResult struct {
 // SearchPageHandler renders the web search page and results
 func SearchPageHandler(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query().Get("q")
+	var timer *prometheus.Timer
+	if q != "" {
+		metrics.SearchTotal.Inc()
+		timer = prometheus.NewTimer(metrics.SearchLatency)
+		defer timer.ObserveDuration()
+	}
+
 	language := r.URL.Query().Get("language")
 	if language == "" {
 		language = "en"
@@ -47,6 +57,10 @@ func SearchPageHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if len(results) > 0 {
+		metrics.SearchWithResult.Inc()
+	}
+
 	renderTemplate(w, r, "search", map[string]any{
 		"Title":   "Search",
 		"Query":   q,
@@ -57,6 +71,13 @@ func SearchPageHandler(w http.ResponseWriter, r *http.Request) {
 // APISearchHandler returns JSON-formatted search results
 func APISearchHandler(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query().Get("q")
+	var timer *prometheus.Timer
+	if q != "" {
+		metrics.SearchTotal.Inc()
+		timer = prometheus.NewTimer(metrics.SearchLatency)
+		defer timer.ObserveDuration()
+	}
+
 	language := r.URL.Query().Get("language")
 	if language == "" {
 		language = "en"
@@ -112,5 +133,11 @@ LIMIT ? OFFSET ?;`
 		}
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{"search_results": results})
+	if len(results) > 0 {
+		metrics.SearchWithResult.Inc()
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"search_results": results,
+	})
 }
