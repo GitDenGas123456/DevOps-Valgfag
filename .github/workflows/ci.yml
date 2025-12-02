@@ -179,7 +179,6 @@ jobs:
           push: true
           tags: |
             ghcr.io/gitdengas123456/devops-valgfag:latest
-
   # -------------------------
   # Deploy to VM (compose + migrate)
   # -------------------------
@@ -196,10 +195,11 @@ jobs:
       - name: Deploy to VM via SSH
         uses: appleboy/ssh-action@v1.1.0
         with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          port: ${{ secrets.SSH_PORT }}
+          # bruger environment-variabler fra miljøet "produktion"
+          host: ${{ vars.PROD_SSH_HOST }}
+          username: ${{ vars.PROD_SSH_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          port: ${{ vars.PROD_SSH_PORT }}
           script: |
             set -e
 
@@ -220,7 +220,7 @@ jobs:
             DATABASE_PATH=data/seed/whoknows.db make migrate.check
 
             echo "Pull latest app image..."
-            docker pull ghcr.io/gitdengas123456/devops-valgfag:latest
+            docker pull ${{ vars.IMAGE }}
 
             echo "Restart compose stack..."
             docker compose -f docker-compose.yml down || true
