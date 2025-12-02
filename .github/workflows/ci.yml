@@ -141,9 +141,13 @@ jobs:
         run: mkdir -p data/seed
 
       - name: Run migrations (apply)
+        env:
+          DATABASE_PATH: data/seed/whoknows.db
         run: make migrate
 
       - name: Run migration check (no pending)
+        env:
+          DATABASE_PATH: data/seed/whoknows.db
         run: make migrate.check
 
   # -------------------------
@@ -186,7 +190,7 @@ jobs:
     if: github.ref == 'refs/heads/main'
 
     steps:
-      - name: Checkout code (for reference, not strictly needed)
+      - name: Checkout code (for reference)
         uses: actions/checkout@v4
 
       - name: Deploy to VM via SSH
@@ -201,17 +205,24 @@ jobs:
 
             cd ~/DevOps-Valgfag
 
-            echo "Pull latest repo state..."
-            git pull origin main
+            echo "Sync repo to origin/main..."
+            git fetch origin main
+            git reset --hard origin/main
+
+            echo "Ensure sqlite3 is installed..."
+            if ! command -v sqlite3 >/dev/null 2>&1; then
+              sudo apt-get update
+              sudo apt-get install -y sqlite3
+            fi
 
             echo "Run DB migrations on prod..."
-            make migrate
-            make migrate.check
+            DATABASE_PATH=data/seed/whoknows.db make migrate
+            DATABASE_PATH=data/seed/whoknows.db make migrate.check
 
             echo "Pull latest app image..."
-            docker pull ${{ vars.IMAGE }}
+            docker pull ghcr.io/gitdengas123456/devops-valgfag:latest
 
-            echo "Restart full compose stack..."
+            echo "Restart compose stack..."
             docker compose -f docker-compose.yml down || true
             docker compose -f docker-compose.yml up -d
 
