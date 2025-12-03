@@ -1,24 +1,36 @@
-# Whoknows Variations
+# WhoKnows (Go) - DevOps-valgfag
 
-This is the Whoknows variations repository. It is not meant for production as it contains several security vulnerabilities and problematic parts on purpose. 
+Go webapp med search/about/login/register/weather sider, sessionbaseret auth, SQLite med seed og valgfri FTS5, API til auth/search og observability endpoints (healthz, metrics, Swagger).
 
-## How to get started
+## Kom i gang
+- Krav: Go 1.25+, Docker til compose, sqlite3 CLI (valgfrit).
+- Lokal koersel: `SEED_ON_BOOT=1 PORT=8080 go run ./cmd/server` opretter `data/seed/whoknows.db` hvis den mangler.
+- Docker: `docker compose up -d` bruger GHCR-imagen og eksponerer app (8080), Prometheus (9090) og Grafana (3000). Byg selv: `docker build -t whoknows-app:local .` og koer via compose eller `docker run -p 8080:8080 -v ${PWD}/data:/app/data whoknows-app:local`.
 
-Each branch is a tutorial in a different topic based on the same Flask application as in the `main` branch. 
+## Konfiguration (env)
+- `PORT` (8080), `DATABASE_PATH` (`data/seed/whoknows.db`), `SEED_ON_BOOT=1`, `SESSION_KEY` (64-byte secret), `SEARCH_FTS=1` (kraever migration 0003), `DMI_API_KEY` til vejrdata.
 
-One way to follow along is by:
+## Data og migrationer
+- Migrationer i `migrations/`; koer med `DATABASE_PATH=... make migrate` eller `scripts/migrate.sh data/seed/whoknows.db`.
+- Seed sker automatisk hvis `users` mangler eller `SEED_ON_BOOT=1`.
+- `migrations/0003_pages_fts.sql` aktiverer FTS5-soegning naar `SEARCH_FTS=1`.
 
-1. Forking the repository to your own account.
+## API og routes
+- Pages: `/`, `/about`, `/login`, `/register`, `/weather`.
+- API: `POST /api/register|login|logout`, `GET /api/search?q=<term>&language=<en|da>`.
+- Observability: `/healthz`, `/metrics`, `/swagger/index.html`; metrics bl.a. `app_search_total`, `app_search_with_result_total`, `app_search_duration_seconds`.
 
-2. Cloning the repository to your local machine.
+## Observability stack
+- Compose-scrape: `monitoring/prometheus/prometheus.yml` (scraper `whoknows-app:8080`); alternativ host-config: `prometheus.yml` (scraper host.docker.internal:8080 + node_exporter paa 9100).
+- Grafana dashboard skabelon: `monitoring/grafana/search-monitoring-dashboard.json` (default login admin/admin).
+- Monitoring-only stack: `docker-compose.monitoring.yml` (Prometheus + Grafana + node_exporter).
 
-3. Checking out the branch you are interested in (e.g. `git checkout <branch_name>`).
+## Udvikling, test og CI
+- Tests: `go test ./...`; fuld pakke: `make check` (fmt, vet, lint, race+cover tests, build, smoke, docker build).
+- Smoke mod koerende app: `PORT=8080 make smoke` (via `scripts/smoke.sh`).
+- CI: `.github/workflows/ci.yml` koerer vet/lint/tests/migrations-check/healthz/hadolint, bygger/pusher til GHCR og deployer via SSH; `.github/workflows/cron.yml` timer/manuel sanity-check; PR/issue-templates i `.github/`.
 
-4. Following the instructions in the README of the branch.
-
-5. You can now push changes to your own repository. 
-
-## Pull requests
-
-If you have any suggestions or improvements to the tutorials, feel free to open a pull request.
-
+## Struktur (kort overblik)
+- `.github/` workflows + PR/issue-templates; `cmd/server/` main + router/bootstrap; `handlers/` sider/auth/search/weather/health; `internal/db` schema + seed; `internal/metrics` Prometheus metrics.
+- `templates/`, `static/` web assets; `data/` seed-db; `migrations/` SQL; `scripts/` helpers; `monitoring/` Prom/Grafana; `tests/` integration; `docs/` swagger/kursusnoter; `rewrite/` eksperimenter; `src/backend/templates` gammel prototype.
+- Oevrige filer: `docker-compose.yml`, `docker-compose.monitoring.yml`, `Dockerfile`, `.env` eksempel, `makefile`, `graph.dot`/`graph.png`, `Taskfile.yml`, `KPI Report`, `LICENSE` (MIT), byggede binarier (`app`, `server`), `stash.patch`.

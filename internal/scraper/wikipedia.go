@@ -60,10 +60,12 @@ func WikipediaSearch(query string, limit int) ([]ScrapedResult, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Wikipedia API returned status %d", resp.StatusCode)
+		return nil, fmt.Errorf("wikipedia API returned status %d", resp.StatusCode)
 	}
 
 	var data wikiResponse
