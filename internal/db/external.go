@@ -43,7 +43,9 @@ VALUES (?, ?, ?, ?, ?)`)
 		_ = tx.Rollback()
 		return err
 	}
-	defer stmt.Close()
+	defer func() {
+		_ = stmt.Close()
+	}()
 
 	for _, r := range items {
 		if _, err := stmt.Exec(query, lang, r.Title, r.URL, r.Snippet); err != nil {
@@ -70,7 +72,9 @@ func GetExternal(database *sql.DB, query, lang string) ([]ExternalResult, error)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	var all []ExternalResult
 	for rows.Next() {
