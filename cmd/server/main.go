@@ -4,6 +4,7 @@
 // @BasePath /
 package main
 
+
 import (
 	"database/sql"
 	"fmt"
@@ -16,14 +17,15 @@ import (
 
 	_ "devops-valgfag/docs"
 	h "devops-valgfag/handlers"
-	dbseed "devops-valgfag/internal/db"
 	metrics "devops-valgfag/internal/metrics"
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/sessions"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	httpSwagger "github.com/swaggo/http-swagger"
-	_ "modernc.org/sqlite"
+
+	// PostgreSQL driver
+	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
 // User represents an application user
@@ -56,7 +58,13 @@ func main() {
 	// Set port
 	port := getenv("PORT", "8080")
 
-	// Path for database
+	// Required PostgreSQL DSN
+	dsn := os.Getenv("DATABASE_URL")
+	if dsn == "" {
+		log.Fatal("DATABASE_URL environment variable is required when using PostgreSQL")
+	}
+
+	// This keeps your original directory creation logic (harmless, still needed for templates)
 	dbPath := getenv("DATABASE_PATH", "data/seed/whoknows.db")
 	if err := os.MkdirAll(filepath.Dir(dbPath), 0o755); err != nil {
 		log.Fatal(err)
@@ -66,34 +74,19 @@ func main() {
 	sessionKey := getenv("SESSION_KEY", "development key")
 	useFTS := getenv("SEARCH_FTS", "")
 
-	// Open DB
-	db, err := sql.Open("sqlite", dbPath)
+	// Open PostgreSQL instead of SQLite
+	db, err := sql.Open("postgres", dsn)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer func() { _ = db.Close() }()
+	defer db.Close()
 
-	// SQLite tuning for concurrency and stability
-	if _, err := db.Exec(`PRAGMA journal_mode=WAL;`); err != nil {
-		log.Printf("PRAGMA journal_mode=WAL failed: %v", err)
-	}
-	if _, err := db.Exec(`PRAGMA synchronous=NORMAL;`); err != nil {
-		log.Printf("PRAGMA synchronous=NORMAL failed: %v", err)
-	}
-	if _, err := db.Exec(`PRAGMA busy_timeout=5000;`); err != nil {
-		log.Printf("PRAGMA busy_timeout failed: %v", err)
+	// Test DB connection
+	if err := db.Ping(); err != nil {
+		log.Fatal("Failed to connect to PostgreSQL:", err)
 	}
 
-	// Seed DB if needed
-	var tableExists int
-	_ = db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='users'`).Scan(&tableExists)
-	if getenv("SEED_ON_BOOT", "") == "1" || tableExists == 0 {
-		fmt.Println("Seeding database...")
-		if err := dbseed.Seed(db); err != nil {
-			log.Fatal("Failed to seed database:", err)
-		}
-	}
-
+	fmt.Println("Connected to PostgreSQL successfully!")
 	// Templates
 	funcs := template.FuncMap{
 		"now":  time.Now,
