@@ -85,8 +85,9 @@ jobs:
   # Health / smoke test
   # -------------------------
   healthz:
-    runs-on: ubuntu-latest
     needs: build
+    runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -110,12 +111,12 @@ jobs:
       - name: Smoke test /healthz
         run: scripts/smoke.sh
 
-      - name: Stop server & upload logs
+      - name: Stop server
         if: always()
+        shell: bash
         run: |
           if [ -f app.pid ]; then kill "$(cat app.pid)" || true; fi
           sleep 1
-        shell: bash
 
       - name: Upload app.log
         if: always()
@@ -128,8 +129,9 @@ jobs:
   # Migrations sanity-check
   # -------------------------
   migrations-check:
-    runs-on: ubuntu-latest
     needs: build
+    runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -154,7 +156,7 @@ jobs:
   # Build & push Docker image (only on main)
   # -------------------------
   docker-build:
-    needs: [build, hadolint, healthz, migrations-check]
+    needs: [ build, hadolint, healthz, migrations-check ]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     permissions:
@@ -179,6 +181,7 @@ jobs:
           push: true
           tags: |
             ghcr.io/gitdengas123456/devops-valgfag:latest
+
   # -------------------------
   # Deploy to VM (compose + migrate)
   # -------------------------
@@ -195,7 +198,7 @@ jobs:
       - name: Deploy to VM via SSH
         uses: appleboy/ssh-action@v1.1.0
         with:
-          # bruger environment-variabler fra miljøet "produktion"
+          # PROD-variabler sættes i miljøet "produktion"
           host: ${{ vars.PROD_SSH_HOST }}
           username: ${{ vars.PROD_SSH_USER }}
           key: ${{ secrets.PROD_SSH_KEY }}

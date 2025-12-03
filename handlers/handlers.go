@@ -1,17 +1,17 @@
 package handlers
 
-// Imports
 import (
 	"database/sql"
 	"encoding/json"
 	"html/template"
+	"log"
 	"net/http"
 	"os"
 
 	"github.com/gorilla/sessions"
 )
 
-// values for database, template and session/cookies
+// Values for database, template and session/cookies
 var (
 	db           *sql.DB
 	tmpl         *template.Template
@@ -25,9 +25,8 @@ func Init(database *sql.DB, templates *template.Template, store *sessions.Cookie
 	sessionStore = store
 }
 
-// renders template
+// Renders template
 func renderTemplate(w http.ResponseWriter, r *http.Request, name string, data map[string]any) {
-
 	// Header
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if data == nil {
@@ -37,8 +36,12 @@ func renderTemplate(w http.ResponseWriter, r *http.Request, name string, data ma
 		data["Title"] = ""
 	}
 	data["LoggedIn"] = isAuthenticated(r)
-	if err := tmpl.ExecuteTemplate(w, name, data); err != nil {
-		http.Error(w, "template exec error: "+err.Error(), http.StatusInternalServerError)
+
+	// Execute template
+	err := tmpl.ExecuteTemplate(w, name, data)
+	if err != nil {
+		// Cannot safely call http.Error if template wrote some content
+		log.Println("template exec error:", err)
 	}
 }
 
@@ -54,7 +57,7 @@ func isAuthenticated(r *http.Request) bool {
 	return ok
 }
 
-// function parsing string to JSON
+// Function parsing struct to JSON
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
@@ -64,7 +67,7 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 // SeedDB loads schema.sql into the given DB
 func SeedDB(db *sql.DB) error {
 	// Use project-root relative path
-	raw, err := os.ReadFile("../internal/db/schema.sql") // <- adjust as needed
+	raw, err := os.ReadFile("../internal/db/schema.sql")
 	if err != nil {
 		return err
 	}

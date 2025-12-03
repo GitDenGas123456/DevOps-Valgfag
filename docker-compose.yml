@@ -8,7 +8,7 @@ services:
       - PORT=8080
       - DATABASE_PATH=/app/data/seed/whoknows.db
       - SEED_ON_BOOT=1
-      - SEARCH_FTS=0
+      - SEARCH_FTS=1
     volumes:
       - ./data:/app/data
     restart: unless-stopped
