@@ -10,9 +10,10 @@ import (
 	"testing"
 	"time"
 
+	h "devops-valgfag/handlers"
+
 	"github.com/gorilla/mux"
 	"github.com/gorilla/sessions"
-	h "devops-valgfag/handlers"
 	_ "modernc.org/sqlite"
 )
 
@@ -57,8 +58,6 @@ func setupTestServer(t *testing.T) (*mux.Router, *sql.DB) {
 
 	return r, db
 }
-
-
 
 func TestIntegration_RegisterLoginSearch(t *testing.T) {
 	router, db := setupTestServer(t)
