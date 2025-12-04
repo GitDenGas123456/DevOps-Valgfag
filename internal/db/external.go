@@ -36,8 +36,13 @@ func InsertExternal(database *sql.DB, query, lang string, items []ExternalResult
 		return err
 	}
 
+
+
+
+
+	
 	stmt, err := tx.Prepare(`
-INSERT INTO external_results (query, language, title, url, snippet)
+INSERT OR IGNORE INTO external_results (query, language, title, url, snippet)
 VALUES (?, ?, ?, ?, ?)`)
 	if err != nil {
 		_ = tx.Rollback()
