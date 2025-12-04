@@ -30,9 +30,9 @@ type wikiResponse struct {
 func WikipediaSearch(query string, limit int) ([]ScrapedResult, error) {
 	endpoint := "https://en.wikipedia.org/w/api.php"
 
-	// Simple sanity clamp for limit
+	// Validate limit parameter
 	if limit <= 0 {
-		limit = 10
+		return nil, fmt.Errorf("limit must be a positive integer, got %d", limit)
 	} else if limit > 50 {
 		limit = 50
 	}
