@@ -85,9 +85,8 @@ jobs:
   # Health / smoke test
   # -------------------------
   healthz:
-    needs: build
     runs-on: ubuntu-latest
-
+    needs: build
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -104,19 +103,19 @@ jobs:
 
       - name: Start server
         run: |
-          nohup go run ./cmd/server > app.log 2>&1 &
+          nohup go run ./cmd/server > app.log 2>&1 & 
           echo $! > app.pid
           sleep 2
 
       - name: Smoke test /healthz
         run: scripts/smoke.sh
 
-      - name: Stop server
+      - name: Stop server & upload logs
         if: always()
-        shell: bash
         run: |
           if [ -f app.pid ]; then kill "$(cat app.pid)" || true; fi
           sleep 1
+        shell: bash
 
       - name: Upload app.log
         if: always()
@@ -129,9 +128,8 @@ jobs:
   # Migrations sanity-check
   # -------------------------
   migrations-check:
-    needs: build
     runs-on: ubuntu-latest
-
+    needs: build
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -153,12 +151,12 @@ jobs:
         run: make migrate.check
 
   # -------------------------
-  # Build & push Docker image (only on main)
+  # Build & push Docker image (only on push to main)
   # -------------------------
   docker-build:
-    needs: [ build, hadolint, healthz, migrations-check ]
+    needs: [build, hadolint, healthz, migrations-check]
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     permissions:
       contents: read
       packages: write
@@ -183,13 +181,13 @@ jobs:
             ghcr.io/gitdengas123456/devops-valgfag:latest
 
   # -------------------------
-  # Deploy to VM (compose + migrate)
+  # Deploy to VM (compose + migrate) – only on push to main
   # -------------------------
   deploy:
     needs: docker-build
     runs-on: ubuntu-latest
     environment: produktion
-    if: github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     steps:
       - name: Checkout code (for reference)
@@ -198,7 +196,6 @@ jobs:
       - name: Deploy to VM via SSH
         uses: appleboy/ssh-action@v1.1.0
         with:
-          # PROD variables are set in the "produktion" environment
           host: ${{ vars.PROD_SSH_HOST }}
           username: ${{ vars.PROD_SSH_USER }}
           key: ${{ secrets.PROD_SSH_KEY }}
