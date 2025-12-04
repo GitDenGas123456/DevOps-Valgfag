@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"time"
 )
 
@@ -28,7 +29,7 @@ type wikiResponse struct {
 func WikipediaSearch(query string, limit int) ([]ScrapedResult, error) {
 	endpoint := "https://en.wikipedia.org/w/api.php"
 
-	// Simple sanity clamp på limit
+	// Simple sanity clamp for limit
 	if limit <= 0 {
 		limit = 10
 	} else if limit > 50 {
@@ -48,10 +49,13 @@ func WikipediaSearch(query string, limit int) ([]ScrapedResult, error) {
 	q.Add("srlimit", fmt.Sprintf("%d", limit))
 	req.URL.RawQuery = q.Encode()
 
-	// User-Agent bør være noget rigtigt hvis I bruger det i prod
-	req.Header.Set("User-Agent", "WhoKnowsBot/1.0 (+https://example.com)")
+	ua := os.Getenv("WIKI_USER_AGENT")
+	if ua == "" {
+		ua = "WhoKnowsBot/1.0 (+https://github.com/GitDenGas123456/DevOps-Valgfag)"
+	}
+	req.Header.Set("User-Agent", ua)
 
-	// Brug en client med timeout i stedet for http.DefaultClient
+	// Use a client with timeout instead of http.DefaultClient
 	client := &http.Client{
 		Timeout: 5 * time.Second,
 	}
@@ -78,7 +82,7 @@ func WikipediaSearch(query string, limit int) ([]ScrapedResult, error) {
 		results = append(results, ScrapedResult{
 			Title:   r.Title,
 			URL:     fmt.Sprintf("https://en.wikipedia.org/?curid=%d", r.PageID),
-			Snippet: r.Snippet, // html/template vil auto-escape når I renderer
+			Snippet: r.Snippet, // html/template escapes on render
 		})
 	}
 

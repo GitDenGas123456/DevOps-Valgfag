@@ -133,6 +133,11 @@ func APISearchHandler(w http.ResponseWriter, r *http.Request) {
 		const limit = 10
 		const offset = 0
 
+		likeQuery := `
+SELECT id, title, url, language, content
+FROM pages
+WHERE language = ? AND (title LIKE ? OR content LIKE ?)`
+
 		// ---------------------------
 		// Stage 1 — Lokal search (FTS eller LIKE)
 		// ---------------------------
@@ -151,7 +156,19 @@ WHERE p.language = ? AND pages_fts MATCH ?
 ORDER BY rank ASC
 LIMIT ? OFFSET ?;`
 			rows, err := db.Query(ftsQuery, language, q, limit, offset)
-			if err == nil {
+			if err != nil {
+				log.Println("FTS search error, falling back to LIKE:", err)
+				rows, err = db.Query(likeQuery, language, "%"+q+"%", "%"+q+"%")
+				if err == nil {
+					defer func() { _ = rows.Close() }()
+					for rows.Next() {
+						var it SearchResult
+						if err := rows.Scan(&it.ID, &it.Title, &it.URL, &it.Language, &it.Description); err == nil {
+							results = append(results, it)
+						}
+					}
+				}
+			} else {
 				defer func() { _ = rows.Close() }()
 				for rows.Next() {
 					var it SearchResult
@@ -162,12 +179,7 @@ LIMIT ? OFFSET ?;`
 				}
 			}
 		} else {
-			rows, err := db.Query(
-				`SELECT id, title, url, language, content
-				 FROM pages
-				 WHERE language = ? AND (title LIKE ? OR content LIKE ?)`,
-				language, "%"+q+"%", "%"+q+"%",
-			)
+			rows, err := db.Query(likeQuery, language, "%"+q+"%", "%"+q+"%")
 			if err == nil {
 				defer func() { _ = rows.Close() }()
 				for rows.Next() {
