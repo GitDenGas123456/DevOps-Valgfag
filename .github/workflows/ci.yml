@@ -184,7 +184,7 @@ jobs:
   # Deploy to VM (compose + migrate)
   # -------------------------
   deploy:
-    needs: docker-build   # kan blive eller fjernes, se note nedenfor
+    needs: docker-build 
     runs-on: ubuntu-latest
     environment: produktion
     if: github.ref == 'refs/heads/main'
