@@ -143,7 +143,6 @@ For development/demo, you can set credentials in a `.env` file or via environmen
 ```env
 GF_SECURITY_ADMIN_USER=yourusername
 GF_SECURITY_ADMIN_PASSWORD=yourpassword
-
 ---
 
 ## Development, Testing and CI
