@@ -6,12 +6,29 @@ services:
       - "8080:8080"
     environment:
       - PORT=8080
-      - DATABASE_PATH=/app/data/seed/whoknows.db
-      - SEED_ON_BOOT=1
-      - SEARCH_FTS=0
-    volumes:
-      - ./data:/app/data
+
+      # --- PostgreSQL CONFIG ---
+      - DATABASE_URL=postgres://admin:admin123@postgres_db:5432/whoknows?sslmode=disable
+      - SEED_ON_BOOT=0      # disable SQLite seeding
+      - SEARCH_FTS=0        # full-text disabled unless you add it in PG
+
+    depends_on:
+      - postgres_db
+
     restart: unless-stopped
+
+  postgres_db:
+    image: postgres:16
+    container_name: postgres_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin123
+      POSTGRES_DB: whoknows
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
 
   node_exporter:
     image: prom/node-exporter:latest
@@ -22,7 +39,7 @@ services:
       - "--path.procfs=/host/proc"
       - "--path.sysfs=/host/sys"
       - "--path.rootfs=/host/rootfs"
-      - "--collector.filesystem.mount-points-exclude=^/(dev|proc|sys|run|boot|var/lib/docker/.+)($|/)"
+      - "--collector.filesystem.mount-points-exclude=^/(dev|proc|sys|run|boot/var/lib/docker/.+)($|/)"
     volumes:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
@@ -62,3 +79,4 @@ services:
 volumes:
   prometheus-data:
   grafana-storage:
+  postgres-data:
