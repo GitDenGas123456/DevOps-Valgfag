@@ -87,6 +87,8 @@ func WikipediaSearch(query string, limit int) ([]ScrapedResult, error) {
 		})
 	}
 
-	log.Printf("WikipediaSearch: found %d results for query %q\n", len(results), query)
+	// Safe logging: no raw query text
+	log.Printf("WikipediaSearch: found %d results (query_len=%d)\n", len(results), len(query))
+
 	return results, nil
 }
