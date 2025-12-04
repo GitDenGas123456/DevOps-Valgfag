@@ -50,8 +50,8 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - GF_SECURITY_ADMIN_USER=devopsuser
-      - GF_SECURITY_ADMIN_PASSWORD=martinhjelm1
+      - GF_SECURITY_ADMIN_USER=${GF_SECURITY_ADMIN_USER}
+      - GF_SECURITY_ADMIN_PASSWORD=${GF_SECURITY_ADMIN_PASSWORD}
     volumes:
       - grafana-storage:/var/lib/grafana
       - ./monitoring/grafana/search-monitoring-dashboard.json:/var/lib/grafana/dashboards/search-monitoring-dashboard.json:ro
