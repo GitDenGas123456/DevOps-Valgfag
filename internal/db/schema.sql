@@ -1,4 +1,6 @@
+-- ===============================
 -- Drop and recreate users table
+-- ===============================
 DROP TABLE IF EXISTS users;
 
 CREATE TABLE IF NOT EXISTS users (
@@ -8,7 +10,9 @@ CREATE TABLE IF NOT EXISTS users (
   password  TEXT NOT NULL
 );
 
+-- ===============================
 -- Drop and recreate pages table
+-- ===============================
 DROP TABLE IF EXISTS pages;
 
 CREATE TABLE IF NOT EXISTS pages (
@@ -28,7 +32,9 @@ VALUES
   ('About Us', '/about', 'en', CURRENT_TIMESTAMP,
    'We intend to build the world’s best search engine.');
 
+-- ===============================
 -- Drop and recreate external_results table (Wikipedia / external cache)
+-- ===============================
 DROP TABLE IF EXISTS external_results;
 
 CREATE TABLE IF NOT EXISTS external_results (
@@ -38,7 +44,8 @@ CREATE TABLE IF NOT EXISTS external_results (
   title      TEXT NOT NULL,
   url        TEXT NOT NULL,
   snippet    TEXT NOT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(query, language, url)                  
 );
 
 CREATE INDEX IF NOT EXISTS idx_external_query_lang
