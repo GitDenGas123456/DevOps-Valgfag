@@ -136,14 +136,13 @@ Configured in `monitoring/prometheus/prometheus.yml`, scraping:
 
 Dashboard provisioned from `monitoring/grafana/search-monitoring-dashboard.json`.
 
-Default login (for dev/demo):
+Default login credentials for Grafana are set via environment variables in your Docker Compose configuration.
 
-```text
-user: devopsuser
-password: martinhjelm1
-```
+For development/demo, you can set credentials in a `.env` file or via environment variables:
 
-Do not reuse these credentials in real production.
+```env
+GF_SECURITY_ADMIN_USER=yourusername
+GF_SECURITY_ADMIN_PASSWORD=yourpassword
 
 ---
 
