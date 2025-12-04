@@ -103,7 +103,7 @@ jobs:
 
       - name: Start server
         run: |
-          nohup go run ./cmd/server > app.log 2>&1 &
+          nohup go run ./cmd/server > app.log 2>&1 & 
           echo $! > app.pid
           sleep 2
 
@@ -151,12 +151,12 @@ jobs:
         run: make migrate.check
 
   # -------------------------
-  # Build & push Docker image (only on main)
+  # Build & push Docker image (only on push to main)
   # -------------------------
   docker-build:
     needs: [build, hadolint, healthz, migrations-check]
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     permissions:
       contents: read
       packages: write
@@ -179,14 +179,15 @@ jobs:
           push: true
           tags: |
             ghcr.io/gitdengas123456/devops-valgfag:latest
+
   # -------------------------
-  # Deploy to VM (compose + migrate)
+  # Deploy to VM (compose + migrate) – only on push to main
   # -------------------------
   deploy:
     needs: docker-build
     runs-on: ubuntu-latest
     environment: produktion
-    if: github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     steps:
       - name: Checkout code (for reference)
@@ -195,7 +196,6 @@ jobs:
       - name: Deploy to VM via SSH
         uses: appleboy/ssh-action@v1.1.0
         with:
-          # bruger environment-variabler fra miljøet "produktion"
           host: ${{ vars.PROD_SSH_HOST }}
           username: ${{ vars.PROD_SSH_USER }}
           key: ${{ secrets.PROD_SSH_KEY }}
