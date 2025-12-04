@@ -198,7 +198,7 @@ jobs:
       - name: Deploy to VM via SSH
         uses: appleboy/ssh-action@v1.1.0
         with:
-          # PROD-variabler sættes i miljøet "produktion"
+          # PROD variables are set in the "production" environment
           host: ${{ vars.PROD_SSH_HOST }}
           username: ${{ vars.PROD_SSH_USER }}
           key: ${{ secrets.PROD_SSH_KEY }}
