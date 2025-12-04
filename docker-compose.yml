@@ -1,6 +1,11 @@
+version: "3.9"
+
 services:
   whoknows-app:
-    image: ghcr.io/gitdengas123456/devops-valgfag:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: devops-valgfag-app
     container_name: whoknows-app
     ports:
       - "8080:8080"

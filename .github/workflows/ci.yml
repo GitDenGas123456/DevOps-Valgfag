@@ -181,7 +181,7 @@ jobs:
             ghcr.io/gitdengas123456/devops-valgfag:latest
 
   # -------------------------
-  # Deploy to VM (compose + migrate) – only on push to main
+  # Deploy to VM (compose + migrate)
   # -------------------------
   deploy:
     needs: docker-build
@@ -219,11 +219,9 @@ jobs:
             DATABASE_PATH=data/seed/whoknows.db make migrate
             DATABASE_PATH=data/seed/whoknows.db make migrate.check
 
-            echo "Pull latest app image..."
-            docker pull ${{ vars.IMAGE }}
-
-            echo "Restart compose stack..."
+            echo "Build & restart compose stack..."
+            # Byg image lokalt på VM i stedet for at pull'e fra GHCR
             docker compose -f docker-compose.yml down || true
-            docker compose -f docker-compose.yml up -d
+            docker compose -f docker-compose.yml up -d --build
 
             echo "Deployment finished."
