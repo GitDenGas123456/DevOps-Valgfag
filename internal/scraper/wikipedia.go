@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -49,7 +50,7 @@ func WikipediaSearch(query string, limit int) ([]ScrapedResult, error) {
 	q.Add("srlimit", fmt.Sprintf("%d", limit))
 	req.URL.RawQuery = q.Encode()
 
-	ua := os.Getenv("WIKI_USER_AGENT")
+	ua := strings.TrimSpace(os.Getenv("WIKI_USER_AGENT"))
 	if ua == "" {
 		ua = "WhoKnowsBot/1.0 (+https://github.com/GitDenGas123456/DevOps-Valgfag)"
 	}

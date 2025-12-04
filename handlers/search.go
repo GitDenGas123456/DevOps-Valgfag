@@ -45,7 +45,7 @@ func SearchPageHandler(w http.ResponseWriter, r *http.Request) {
 	var results []SearchResult
 	if q != "" {
 		// ---------------------------
-		// Stage 1 — Lokal search i pages
+		// Stage 1 - Local search in pages
 		// ---------------------------
 		rows, err := db.Query(
 			`SELECT id, title, url, language, content
@@ -64,7 +64,7 @@ func SearchPageHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// ---------------------------
-		// Stage 2 — Wikipedia-search hvis IKKE cached
+		// Stage 2 - Wikipedia search when NOT cached
 		// ---------------------------
 		if !dbx.ExternalExists(db, q, language) {
 			scraped, err := scraper.WikipediaSearch(q, 10)
@@ -86,7 +86,7 @@ func SearchPageHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// ---------------------------
-		// Stage 3 — Load cached Wikipedia-results
+		// Stage 3 - Load cached Wikipedia results
 		// ---------------------------
 		external, err := dbx.GetExternal(db, q, language)
 		if err == nil {
@@ -139,7 +139,7 @@ FROM pages
 WHERE language = ? AND (title LIKE ? OR content LIKE ?)`
 
 		// ---------------------------
-		// Stage 1 — Lokal search (FTS eller LIKE)
+		// Stage 1 - Local search (FTS or LIKE)
 		// ---------------------------
 		if useFTSSearch {
 			// FTS-powered search when enabled
@@ -192,7 +192,7 @@ LIMIT ? OFFSET ?;`
 		}
 
 		// ---------------------------
-		// Stage 2 — Wikipedia-search hvis IKKE cached
+		// Stage 2 - Wikipedia search when NOT cached
 		// ---------------------------
 		if !dbx.ExternalExists(db, q, language) {
 			scraped, err := scraper.WikipediaSearch(q, 10)
@@ -214,17 +214,21 @@ LIMIT ? OFFSET ?;`
 		}
 
 		// ---------------------------
-		// Stage 3 — Load cached Wikipedia-results
+		// Stage 3 - Load cached Wikipedia results
 		// ---------------------------
-		external, _ := dbx.GetExternal(db, q, language)
-		for _, e := range external {
-			results = append(results, SearchResult{
-				ID:          0,
-				Title:       e.Title,
-				URL:         e.URL,
-				Language:    language,
-				Description: e.Snippet,
-			})
+		external, err := dbx.GetExternal(db, q, language)
+		if err != nil {
+			log.Println("GetExternal error:", err)
+		} else {
+			for _, e := range external {
+				results = append(results, SearchResult{
+					ID:          0,
+					Title:       e.Title,
+					URL:         e.URL,
+					Language:    language,
+					Description: e.Snippet,
+				})
+			}
 		}
 	}
 
