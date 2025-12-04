@@ -64,7 +64,7 @@ func main() {
 
 	// Session key + FTS flag
 	sessionKey := getenv("SESSION_KEY", "development key")
-	useFTS := getenv("SEARCH_FTS", "1")
+	useFTS := getenv("SEARCH_FTS", "0")
 
 	// Open DB
 	db, err := sql.Open("sqlite", dbPath)
