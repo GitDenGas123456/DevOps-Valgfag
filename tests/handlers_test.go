@@ -65,7 +65,7 @@ CREATE TABLE IF NOT EXISTS pages (
 	return db
 }
 
-// Sikre db lukker efter test
+// Ensure db is closed after test
 func closeDB(t *testing.T, db *sql.DB) {
 	t.Helper()
 	if err := db.Close(); err != nil {
