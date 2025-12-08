@@ -18,7 +18,6 @@ func Seed(database *sql.DB) error {
 		return nil
 	}
 
-	
 	scanner := bufio.NewScanner(bytes.NewReader(raw))
 	var b strings.Builder
 	for scanner.Scan() {
@@ -44,5 +43,16 @@ func Seed(database *sql.DB) error {
 			return err
 		}
 	}
+
+	appEnv := strings.ToLower(strings.TrimSpace(os.Getenv("APP_ENV")))
+	if appEnv != "prod" && appEnv != "production" {
+		if _, err := database.Exec(`
+INSERT OR IGNORE INTO users (username, email, password)
+VALUES ('admin', 'dev@example.com', '$2a$10$wHgFJ4EvAty4/nXZ7LxROulqfEUvvVdHRK3g.B40VgTfZ2.PU6vSm');
+`); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }

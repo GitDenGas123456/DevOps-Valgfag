@@ -20,13 +20,13 @@ jobs:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_USER: admin
-          POSTGRES_PASSWORD: admin123
-          POSTGRES_DB: whoknows
+          POSTGRES_USER: ${{ vars.CI_POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ vars.CI_POSTGRES_DB }}
         ports:
           - 5432:5432
         options: >-
-          --health-cmd="pg_isready -U admin -d whoknows"
+          --health-cmd="pg_isready -U ${{ vars.CI_POSTGRES_USER }} -d ${{ vars.CI_POSTGRES_DB }}"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
@@ -63,12 +63,12 @@ jobs:
 
       - name: Run DB migrations (Postgres)
         env:
-          DATABASE_URL: postgres://admin:admin123@localhost:5432/whoknows?sslmode=disable
+          DATABASE_URL: postgres://${{ vars.CI_POSTGRES_USER }}:${{ secrets.CI_POSTGRES_PASSWORD }}@localhost:5432/${{ vars.CI_POSTGRES_DB }}?sslmode=disable
         run: make migrate
 
       - name: Run tests (race + coverage)
         env:
-          DATABASE_URL: postgres://admin:admin123@localhost:5432/whoknows?sslmode=disable
+          DATABASE_URL: postgres://${{ vars.CI_POSTGRES_USER }}:${{ secrets.CI_POSTGRES_PASSWORD }}@localhost:5432/${{ vars.CI_POSTGRES_DB }}?sslmode=disable
         run: |
           go test -v -race ./... \
             -coverpkg=./cmd/server,./handlers,./internal/db \
@@ -106,6 +106,21 @@ jobs:
   healthz:
     runs-on: ubuntu-latest
     needs: build
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ${{ vars.CI_POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ vars.CI_POSTGRES_DB }}
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U ${{ vars.CI_POSTGRES_USER }} -d ${{ vars.CI_POSTGRES_DB }}"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -117,14 +132,19 @@ jobs:
           check-latest: true
           cache: true
 
+      - name: Run DB migrations (Postgres)
+        env:
+          DATABASE_URL: postgres://${{ vars.CI_POSTGRES_USER }}:${{ secrets.CI_POSTGRES_PASSWORD }}@localhost:5432/${{ vars.CI_POSTGRES_DB }}?sslmode=disable
+        run: make migrate
+
       - name: Build server
-        run: go build ./cmd/server
+        run: go build -o server ./cmd/server
 
       - name: Start server
         env:
-          DATABASE_URL: postgres://admin:admin123@localhost:5432/whoknows?sslmode=disable
+          DATABASE_URL: postgres://${{ vars.CI_POSTGRES_USER }}:${{ secrets.CI_POSTGRES_PASSWORD }}@localhost:5432/${{ vars.CI_POSTGRES_DB }}?sslmode=disable
         run: |
-          nohup go run ./cmd/server > app.log 2>&1 &
+          nohup ./server > app.log 2>&1 &
           echo $! > app.pid
           sleep 2
 
@@ -145,12 +165,12 @@ jobs:
           path: app.log
 
   # -------------------------
-  # Build & push Docker image (main only)
+  # Build & push Docker image (only on push to main)
   # -------------------------
   docker-build:
     needs: [build, hadolint, healthz]
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     permissions:
       contents: read
       packages: write
@@ -181,7 +201,7 @@ jobs:
     needs: docker-build
     runs-on: ubuntu-latest
     environment: produktion
-    if: github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     steps:
       - name: Checkout code (for reference)
@@ -193,25 +213,4 @@ jobs:
           host: ${{ vars.PROD_SSH_HOST }}
           username: ${{ vars.PROD_SSH_USER }}
           key: ${{ secrets.PROD_SSH_KEY }}
-          port: ${{ vars.PROD_SSH_PORT }}
-          script: |
-            set -e
-
-            cd ~/DevOps-Valgfag
-
-            echo "Sync repo to origin/main..."
-            git fetch origin main
-            git reset --hard origin/main
-
-            echo "Running Postgres migrations on production..."
-            DATABASE_URL=postgres://admin:admin123@postgres_db:5432/whoknows?sslmode=disable make migrate
-            DATABASE_URL=postgres://admin:admin123@postgres_db:5432/whoknows?sslmode=disable make migrate.check
-
-            echo "Pull latest app image..."
-            docker pull ${{ vars.IMAGE }}
-
-            echo "Restart Docker Compose stack..."
-            docker compose -f docker-compose.yml down || true
-            docker compose -f docker-compose.yml up -d
-
-            echo "Deployment complete."
+         

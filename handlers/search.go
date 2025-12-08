@@ -1,9 +1,13 @@
 package handlers
 
 import (
+	"log"
 	"net/http"
 
+	dbx "devops-valgfag/internal/db"
 	"devops-valgfag/internal/metrics"
+	"devops-valgfag/internal/scraper"
+
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -44,6 +48,9 @@ func SearchPageHandler(w http.ResponseWriter, r *http.Request) {
 
 	// BASIC SEARCH (ILIKE for PostgreSQL)
 	if q != "" {
+		// ---------------------------
+		// Stage 1 - Local search in pages
+		// ---------------------------
 		rows, err := db.Query(
 			`SELECT id, title, url, language, content
 			 FROM pages
@@ -60,6 +67,44 @@ func SearchPageHandler(w http.ResponseWriter, r *http.Request) {
 				if err := rows.Scan(&it.ID, &it.Title, &it.URL, &it.Language, &it.Description); err == nil {
 					results = append(results, it)
 				}
+			}
+		}
+
+		// ---------------------------
+		// Stage 2 - Wikipedia search when NOT cached
+		// ---------------------------
+		if !dbx.ExternalExists(db, q, language) {
+			scraped, err := scraper.WikipediaSearch(q, 10)
+			if err != nil {
+				log.Println("WikipediaSearch error:", err)
+			} else if len(scraped) > 0 {
+				store := []dbx.ExternalResult{}
+				for _, s := range scraped {
+					store = append(store, dbx.ExternalResult{
+						Title:   s.Title,
+						URL:     s.URL,
+						Snippet: s.Snippet,
+					})
+				}
+				if err := dbx.InsertExternal(db, q, language, store); err != nil {
+					log.Println("InsertExternal error:", err)
+				}
+			}
+		}
+
+		// ---------------------------
+		// Stage 3 - Load cached Wikipedia results
+		// ---------------------------
+		external, err := dbx.GetExternal(db, q, language)
+		if err == nil {
+			for _, e := range external {
+				results = append(results, SearchResult{
+					ID:          0,
+					Title:       e.Title,
+					URL:         e.URL,
+					Language:    language,
+					Description: e.Snippet,
+				})
 			}
 		}
 	}
@@ -143,6 +188,46 @@ func APISearchHandler(w http.ResponseWriter, r *http.Request) {
 						results = append(results, it)
 					}
 				}
+			}
+		}
+
+		// ---------------------------
+		// Stage 2 - Wikipedia search when NOT cached
+		// ---------------------------
+		if !dbx.ExternalExists(db, q, language) {
+			scraped, err := scraper.WikipediaSearch(q, 10)
+			if err != nil {
+				log.Println("WikipediaSearch error:", err)
+			} else if len(scraped) > 0 {
+				store := []dbx.ExternalResult{}
+				for _, s := range scraped {
+					store = append(store, dbx.ExternalResult{
+						Title:   s.Title,
+						URL:     s.URL,
+						Snippet: s.Snippet,
+					})
+				}
+				if err := dbx.InsertExternal(db, q, language, store); err != nil {
+					log.Println("InsertExternal error:", err)
+				}
+			}
+		}
+
+		// ---------------------------
+		// Stage 3 - Load cached Wikipedia results
+		// ---------------------------
+		external, err := dbx.GetExternal(db, q, language)
+		if err != nil {
+			log.Println("GetExternal error:", err)
+		} else {
+			for _, e := range external {
+				results = append(results, SearchResult{
+					ID:          0,
+					Title:       e.Title,
+					URL:         e.URL,
+					Language:    language,
+					Description: e.Snippet,
+				})
 			}
 		}
 	}
