@@ -20,7 +20,11 @@ type User struct {
 // and verifies the password using bcrypt.
 func APILoginHandler(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "bad form"})
+		// Keep a consistent HTML response instead of JSON for this handler
+		renderTemplate(w, r, "login", map[string]any{
+			"Title": "Sign In",
+			"error": "Bad request",
+		})
 		return
 	}
 
@@ -35,20 +39,11 @@ func APILoginHandler(w http.ResponseWriter, r *http.Request) {
 		username,
 	).Scan(&u.ID, &u.Username, &u.Email, &u.Password)
 
-	// If the username does not exist, return an error
-	if err != nil {
-		renderTemplate(w, r, "login", map[string]any{
-			"Title": "Sign In",
-			"error": "Invalid username",
-		})
-		return
-	}
-
-	// Compare submitted password with the stored bcrypt hash
-	if bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(password)) != nil {
+	// Avoid username enumeration by not distinguishing between "bad user" and "bad password"
+	if err != nil || bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(password)) != nil {
 		renderTemplate(w, r, "login", map[string]any{
 			"Title":    "Sign In",
-			"error":    "Invalid password",
+			"error":    "Invalid username or password",
 			"username": username,
 		})
 		return
@@ -67,7 +62,11 @@ func APILoginHandler(w http.ResponseWriter, r *http.Request) {
 // and inserts the user into PostgreSQL.
 func APIRegisterHandler(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "bad form"})
+		// Samme kontrakt som login: HTML, ikke JSON
+		renderTemplate(w, r, "register", map[string]any{
+			"Title": "Sign Up",
+			"error": "Bad request",
+		})
 		return
 	}
 
