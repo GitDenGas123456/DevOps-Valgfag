@@ -18,6 +18,7 @@ import (
 	_ "devops-valgfag/docs"
 	h "devops-valgfag/handlers"
 	metrics "devops-valgfag/internal/metrics"
+	migrate "devops-valgfag/internal/migrate"
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/sessions"
@@ -84,6 +85,12 @@ func main() {
 	// Test DB connection
 	if err := db.Ping(); err != nil {
 		log.Fatal("Failed to connect to PostgreSQL:", err)
+	}
+
+
+	// Run PostgreSQL migrations here
+	if err := migrate.RunMigrations(db); err != nil {
+		log.Fatal("Migration error:", err)
 	}
 
 	fmt.Println("Connected to PostgreSQL successfully!")

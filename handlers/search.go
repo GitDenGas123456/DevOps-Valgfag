@@ -23,7 +23,9 @@ type SearchResult struct {
 	Description string
 }
 
-// SearchPageHandler renders the web search page and results
+// -----------------------------------------------------------------------------
+// WEB PAGE SEARCH HANDLER (PostgreSQL-compatible)
+// -----------------------------------------------------------------------------
 func SearchPageHandler(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query().Get("q")
 	var timer *prometheus.Timer
@@ -39,15 +41,20 @@ func SearchPageHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var results []SearchResult
+
+	// BASIC SEARCH (ILIKE for PostgreSQL)
 	if q != "" {
 		rows, err := db.Query(
 			`SELECT id, title, url, language, content
 			 FROM pages
-			 WHERE language = ? AND (title LIKE ? OR content LIKE ?)`,
-			language, "%"+q+"%", "%"+q+"%",
+			 WHERE language = $1 
+			   AND (title ILIKE $2 OR content ILIKE $2)`,
+			language, "%"+q+"%",
 		)
+
 		if err == nil {
-			defer func() { _ = rows.Close() }()
+			defer rows.Close()
+
 			for rows.Next() {
 				var it SearchResult
 				if err := rows.Scan(&it.ID, &it.Title, &it.URL, &it.Language, &it.Description); err == nil {
@@ -68,7 +75,9 @@ func SearchPageHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// APISearchHandler returns JSON-formatted search results
+// -----------------------------------------------------------------------------
+// API SEARCH HANDLER (PostgreSQL-compatible)
+// -----------------------------------------------------------------------------
 func APISearchHandler(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query().Get("q")
 	var timer *prometheus.Timer
@@ -84,45 +93,50 @@ func APISearchHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var results []SearchResult
+
 	if q != "" {
 		const limit = 10
 		const offset = 0
 
+		// ---------------------------------------------------------------------
+		// FTS SEARCH (PostgreSQL content_tsv)
+		// ---------------------------------------------------------------------
 		if useFTSSearch {
-			// FTS-powered search when enabled
 			ftsQuery := `
-SELECT p.id,
-       p.title,
-       p.url,
-       p.language,
-       p.content,
-       bm25(pages_fts) AS rank
-FROM pages_fts
-JOIN pages p ON p.id = pages_fts.rowid
-WHERE p.language = ? AND pages_fts MATCH ?
-ORDER BY rank ASC
-LIMIT ? OFFSET ?;`
+				SELECT id, title, url, language, content
+				FROM pages
+				WHERE language = $1
+				  AND content_tsv @@ plainto_tsquery($2)
+				ORDER BY ts_rank(content_tsv, plainto_tsquery($2)) DESC
+				LIMIT $3 OFFSET $4;
+			`
+
 			rows, err := db.Query(ftsQuery, language, q, limit, offset)
 			if err == nil {
-				defer func() { _ = rows.Close() }()
+				defer rows.Close()
 				for rows.Next() {
 					var it SearchResult
-					var rank float64
-					if err := rows.Scan(&it.ID, &it.Title, &it.URL, &it.Language, &it.Description, &rank); err == nil {
+					if err := rows.Scan(&it.ID, &it.Title, &it.URL, &it.Language, &it.Description); err == nil {
 						results = append(results, it)
 					}
 				}
 			}
+
 		} else {
+			// -----------------------------------------------------------------
+			// BASIC SEARCH
+			// -----------------------------------------------------------------
 			rows, err := db.Query(
 				`SELECT id, title, url, language, content
-			 FROM pages
-			 WHERE language = ? AND (title LIKE ? OR content LIKE ?)`,
-				language, "%"+q+"%", "%"+q+"%",
+				 FROM pages
+				 WHERE language = $1
+				   AND (title ILIKE $2 OR content ILIKE $2)
+				 LIMIT $3 OFFSET $4`,
+				language, "%"+q+"%", limit, offset,
 			)
-			// Error catch for no result
+
 			if err == nil {
-				defer func() { _ = rows.Close() }()
+				defer rows.Close()
 				for rows.Next() {
 					var it SearchResult
 					if err := rows.Scan(&it.ID, &it.Title, &it.URL, &it.Language, &it.Description); err == nil {

@@ -1,20 +1,23 @@
+version: "3.9"
+
 services:
   whoknows-app:
-    image: ghcr.io/gitdengas123456/devops-valgfag:pg-migration
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: whoknows-app
     ports:
       - "8080:8080"
     environment:
       - PORT=8080
-
-      # --- PostgreSQL CONFIG ---
       - DATABASE_URL=postgres://admin:admin123@postgres_db:5432/whoknows?sslmode=disable
-      - SEED_ON_BOOT=0      # disable SQLite seeding
-      - SEARCH_FTS=0        # full-text disabled unless you add it in PG
-
+      - SEED_ON_BOOT=0
+      - SEARCH_FTS=0
+    volumes:
+      - ./migrations:/app/migrations
     depends_on:
-      - postgres_db
-
+      postgres_db:
+        condition: service_healthy
     restart: unless-stopped
 
   postgres_db:
@@ -29,6 +32,11 @@ services:
       - "5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d whoknows"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   node_exporter:
     image: prom/node-exporter:latest
