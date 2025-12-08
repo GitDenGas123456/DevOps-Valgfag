@@ -20,13 +20,13 @@ jobs:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_USER: admin
-          POSTGRES_PASSWORD: admin123
-          POSTGRES_DB: whoknows
+          POSTGRES_USER: ${{ vars.CI_POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ vars.CI_POSTGRES_DB }}
         ports:
           - 5432:5432
         options: >-
-          --health-cmd="pg_isready -U admin -d whoknows"
+          --health-cmd="pg_isready -U ${{ vars.CI_POSTGRES_USER }} -d ${{ vars.CI_POSTGRES_DB }}"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
@@ -63,14 +63,12 @@ jobs:
 
       - name: Run DB migrations (Postgres)
         env:
-          # CI-database (ikke prod secret)
-          DATABASE_URL: postgres://admin:admin123@localhost:5432/whoknows?sslmode=disable
+          DATABASE_URL: postgres://${{ vars.CI_POSTGRES_USER }}:${{ secrets.CI_POSTGRES_PASSWORD }}@localhost:5432/${{ vars.CI_POSTGRES_DB }}?sslmode=disable
         run: make migrate
 
       - name: Run tests (race + coverage)
         env:
-          # CI-database (ikke prod secret)
-          DATABASE_URL: postgres://admin:admin123@localhost:5432/whoknows?sslmode=disable
+          DATABASE_URL: postgres://${{ vars.CI_POSTGRES_USER }}:${{ secrets.CI_POSTGRES_PASSWORD }}@localhost:5432/${{ vars.CI_POSTGRES_DB }}?sslmode=disable
         run: |
           go test -v -race ./... \
             -coverpkg=./cmd/server,./handlers,./internal/db \
@@ -112,13 +110,13 @@ jobs:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_USER: admin
-          POSTGRES_PASSWORD: admin123
-          POSTGRES_DB: whoknows
+          POSTGRES_USER: ${{ vars.CI_POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ vars.CI_POSTGRES_DB }}
         ports:
           - 5432:5432
         options: >-
-          --health-cmd="pg_isready -U admin -d whoknows"
+          --health-cmd="pg_isready -U ${{ vars.CI_POSTGRES_USER }} -d ${{ vars.CI_POSTGRES_DB }}"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
@@ -136,7 +134,7 @@ jobs:
 
       - name: Run DB migrations (Postgres)
         env:
-          DATABASE_URL: postgres://admin:admin123@localhost:5432/whoknows?sslmode=disable
+          DATABASE_URL: postgres://${{ vars.CI_POSTGRES_USER }}:${{ secrets.CI_POSTGRES_PASSWORD }}@localhost:5432/${{ vars.CI_POSTGRES_DB }}?sslmode=disable
         run: make migrate
 
       - name: Build server
@@ -144,7 +142,7 @@ jobs:
 
       - name: Start server
         env:
-          DATABASE_URL: postgres://admin:admin123@localhost:5432/whoknows?sslmode=disable
+          DATABASE_URL: postgres://${{ vars.CI_POSTGRES_USER }}:${{ secrets.CI_POSTGRES_PASSWORD }}@localhost:5432/${{ vars.CI_POSTGRES_DB }}?sslmode=disable
         run: |
           nohup ./server > app.log 2>&1 &
           echo $! > app.pid
@@ -215,23 +213,4 @@ jobs:
           host: ${{ vars.PROD_SSH_HOST }}
           username: ${{ vars.PROD_SSH_USER }}
           key: ${{ secrets.PROD_SSH_KEY }}
-          port: ${{ vars.PROD_SSH_PORT }}
-          script: |
-            set -e
-
-            cd ~/DevOps-Valgfag
-
-            echo "Sync repo to origin/main..."
-            git fetch origin main
-            git reset --hard origin/main
-
-            echo "Running Postgres migrations on production..."
-            export DATABASE_URL="${{ secrets.DATABASE_URL }}"
-            make migrate
-            make migrate.check || true
-
-            echo "Build & restart compose stack..."
-            docker compose -f docker-compose.yml down || true
-            docker compose -f docker-compose.yml up -d --build
-
-            echo "Deployment complete."
+         
