@@ -66,7 +66,6 @@ jobs:
           DATABASE_URL: postgres://${{ vars.CI_POSTGRES_USER }}:${{ secrets.CI_POSTGRES_PASSWORD }}@localhost:5432/${{ vars.CI_POSTGRES_DB }}?sslmode=disable
         run: echo "Migrations handled by app at container startup"
 
-
       - name: Run tests (race + coverage)
         env:
           DATABASE_URL: postgres://${{ vars.CI_POSTGRES_USER }}:${{ secrets.CI_POSTGRES_PASSWORD }}@localhost:5432/${{ vars.CI_POSTGRES_DB }}?sslmode=disable
@@ -137,7 +136,6 @@ jobs:
         env:
           DATABASE_URL: postgres://${{ vars.CI_POSTGRES_USER }}:${{ secrets.CI_POSTGRES_PASSWORD }}@localhost:5432/${{ vars.CI_POSTGRES_DB }}?sslmode=disable
         run: echo "Migrations handled by app at container startup"
-
 
       - name: Build server
         run: go build -o server ./cmd/server
@@ -215,4 +213,22 @@ jobs:
           host: ${{ vars.PROD_SSH_HOST }}
           username: ${{ vars.PROD_SSH_USER }}
           key: ${{ secrets.PROD_SSH_KEY }}
-         
+          script: |
+            set -e
+
+            echo "==> Går til app-mappe på VM..."
+            cd /home/devops/whoknows   # RET hvis din sti er anderledes
+
+            echo "==> Henter seneste compose + config fra main..."
+            git pull origin main
+
+            echo "==> Puller seneste image fra GHCR..."
+            docker compose pull
+
+            echo "==> Starter/retstarter compose stack..."
+            docker compose up -d --remove-orphans
+
+            echo "==> Rydder gamle images..."
+            docker image prune -f
+
+            echo "Deployment finished."
