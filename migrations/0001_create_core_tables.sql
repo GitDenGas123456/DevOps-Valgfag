@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS pages (
     id SERIAL PRIMARY KEY,
     title        VARCHAR(255) NOT NULL UNIQUE,
-    url          VARCHAR(255) NOT NULL UNIQUE,
+    url          VARCHAR(2048) NOT NULL UNIQUE,
     language     VARCHAR(2) NOT NULL
                    CHECK (language IN ('en', 'da'))
                    DEFAULT 'en',
