@@ -75,7 +75,7 @@ func main() {
 	useFTS := getenv("SEARCH_FTS", "")
 
 	// Open PostgreSQL instead of SQLite
-	db, err := sql.Open("postgres", dsn)
+	db, err := sql.Open("pgx", dsn)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -146,4 +146,4 @@ func getenv(key, fallback string) string {
 		return v
 	}
 	return fallback
-}
+}	
