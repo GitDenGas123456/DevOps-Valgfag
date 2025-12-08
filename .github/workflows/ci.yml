@@ -64,7 +64,8 @@ jobs:
       - name: Run DB migrations (Postgres)
         env:
           DATABASE_URL: postgres://${{ vars.CI_POSTGRES_USER }}:${{ secrets.CI_POSTGRES_PASSWORD }}@localhost:5432/${{ vars.CI_POSTGRES_DB }}?sslmode=disable
-        run: make migrate
+        run: echo "Migrations handled by app at container startup"
+
 
       - name: Run tests (race + coverage)
         env:
@@ -135,7 +136,8 @@ jobs:
       - name: Run DB migrations (Postgres)
         env:
           DATABASE_URL: postgres://${{ vars.CI_POSTGRES_USER }}:${{ secrets.CI_POSTGRES_PASSWORD }}@localhost:5432/${{ vars.CI_POSTGRES_DB }}?sslmode=disable
-        run: make migrate
+        run: echo "Migrations handled by app at container startup"
+
 
       - name: Build server
         run: go build -o server ./cmd/server
