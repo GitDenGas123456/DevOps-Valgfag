@@ -18,7 +18,7 @@ func EnableFTSSearch(on bool) {
 	useFTSSearch = on
 }
 
-// SearchResult represents a single search result row
+// SearchResult represents a single search result row.
 type SearchResult struct {
 	ID          int
 	Title       string
@@ -32,6 +32,7 @@ type SearchResult struct {
 // -----------------------------------------------------------------------------
 func SearchPageHandler(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query().Get("q")
+
 	var timer *prometheus.Timer
 	if q != "" {
 		metrics.SearchTotal.Inc()
@@ -58,7 +59,6 @@ func SearchPageHandler(w http.ResponseWriter, r *http.Request) {
 			   AND (title ILIKE $2 OR content ILIKE $2)`,
 			language, "%"+q+"%",
 		)
-
 		if err == nil {
 			defer rows.Close()
 
@@ -125,6 +125,7 @@ func SearchPageHandler(w http.ResponseWriter, r *http.Request) {
 // -----------------------------------------------------------------------------
 func APISearchHandler(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query().Get("q")
+
 	var timer *prometheus.Timer
 	if q != "" {
 		metrics.SearchTotal.Inc()
@@ -147,12 +148,14 @@ func APISearchHandler(w http.ResponseWriter, r *http.Request) {
 		// FTS SEARCH (PostgreSQL content_tsv)
 		// ---------------------------------------------------------------------
 		if useFTSSearch {
+			// Use a CTE so plainto_tsquery($2) is parsed only once.
 			ftsQuery := `
+				WITH q AS (SELECT plainto_tsquery($2) AS query)
 				SELECT id, title, url, language, content
-				FROM pages
+				FROM pages, q
 				WHERE language = $1
-				  AND content_tsv @@ plainto_tsquery($2)
-				ORDER BY ts_rank(content_tsv, plainto_tsquery($2)) DESC
+				  AND content_tsv @@ q.query
+				ORDER BY ts_rank(content_tsv, q.query) DESC
 				LIMIT $3 OFFSET $4;
 			`
 
@@ -166,10 +169,9 @@ func APISearchHandler(w http.ResponseWriter, r *http.Request) {
 					}
 				}
 			}
-
 		} else {
 			// -----------------------------------------------------------------
-			// BASIC SEARCH
+			// BASIC SEARCH (ILIKE)
 			// -----------------------------------------------------------------
 			rows, err := db.Query(
 				`SELECT id, title, url, language, content
@@ -179,7 +181,6 @@ func APISearchHandler(w http.ResponseWriter, r *http.Request) {
 				 LIMIT $3 OFFSET $4`,
 				language, "%"+q+"%", limit, offset,
 			)
-
 			if err == nil {
 				defer rows.Close()
 				for rows.Next() {
