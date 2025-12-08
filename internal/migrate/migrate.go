@@ -3,11 +3,15 @@ package migrate
 import (
 	"database/sql"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
+// RunMigrations applies all .sql files in the migrations/ folder in
+// alphabetical order. Each migration is executed in a transaction and
+// recorded in the schema_migrations table.
 func RunMigrations(db *sql.DB) error {
 	// Ensure schema_migrations exists
 	_, err := db.Exec(`
@@ -25,13 +29,19 @@ func RunMigrations(db *sql.DB) error {
 		return fmt.Errorf("failed to read migrations folder: %w", err)
 	}
 
+	// Ensure deterministic order (e.g. 0001_..., 0002_...)
+	sort.Strings(files)
+
 	for _, file := range files {
 		version := filepath.Base(file)
 		version = strings.TrimSuffix(version, filepath.Ext(version))
 
-		// Check if applied
+		// Check if migration already applied
 		var count int
-		err = db.QueryRow("SELECT COUNT(*) FROM schema_migrations WHERE version=$1", version).Scan(&count)
+		err = db.QueryRow(
+			"SELECT COUNT(*) FROM schema_migrations WHERE version = $1",
+			version,
+		).Scan(&count)
 		if err != nil {
 			return fmt.Errorf("failed to query schema_migrations: %w", err)
 		}
@@ -42,22 +52,35 @@ func RunMigrations(db *sql.DB) error {
 		}
 
 		// Load SQL file
-		content, err := ioutil.ReadFile(file)
+		content, err := os.ReadFile(file)
 		if err != nil {
 			return fmt.Errorf("failed to read migration %s: %w", file, err)
 		}
 
-		// Execute migration
 		fmt.Println("Applying migration:", version)
-		_, err = db.Exec(string(content))
+
+		// Execute migration in a transaction for atomicity
+		tx, err := db.Begin()
 		if err != nil {
+			return fmt.Errorf("failed to begin transaction for migration %s: %w", version, err)
+		}
+
+		if _, err := tx.Exec(string(content)); err != nil {
+			_ = tx.Rollback()
 			return fmt.Errorf("migration %s failed: %w", version, err)
 		}
 
-		// Mark migration as applied
-		_, err = db.Exec("INSERT INTO schema_migrations (version) VALUES ($1)", version)
-		if err != nil {
+		if _, err := tx.Exec(
+			"INSERT INTO schema_migrations (version) VALUES ($1)",
+			version,
+		); err != nil {
+			_ = tx.Rollback()
 			return fmt.Errorf("failed to insert migration record %s: %w", version, err)
+		}
+
+		if err := tx.Commit(); err != nil {
+			_ = tx.Rollback()
+			return fmt.Errorf("failed to commit transaction for migration %s: %w", version, err)
 		}
 	}
 
