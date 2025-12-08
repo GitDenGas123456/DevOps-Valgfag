@@ -72,7 +72,7 @@ func main() {
 
 	// Session key + FTS flag
 	sessionKey := getenv("SESSION_KEY", "development key")
-	useFTS := getenv("SEARCH_FTS", "")
+	useFTS := getenv("SEARCH_FTS", "0")
 
 	// Open PostgreSQL instead of SQLite
 	db, err := sql.Open("pgx", dsn)
@@ -97,6 +97,7 @@ func main() {
 	// Session cookies
 	sessionStore := sessions.NewCookieStore([]byte(sessionKey))
 
+	// Wire handlers
 	h.Init(db, tmpl, sessionStore)
 
 	// Toggle FTS
@@ -108,6 +109,7 @@ func main() {
 
 	// Router
 	r := mux.NewRouter()
+	// Metrics middleware
 	r.Use(metrics.RequestMetricsMiddleware())
 
 	// Static files
