@@ -160,6 +160,19 @@ func APISearchHandler(w http.ResponseWriter, r *http.Request) {
 			`
 
 			rows, err := db.Query(ftsQuery, language, q, limit, offset)
+			if err != nil {
+				// Fallback to ILIKE if FTS fails (e.g. missing tsvector, bad query)
+				log.Println("FTS search error, falling back to ILIKE:", err)
+				rows, err = db.Query(
+					`SELECT id, title, url, language, content
+					 FROM pages
+					 WHERE language = $1
+					   AND (title ILIKE $2 OR content ILIKE $2)
+					 LIMIT $3 OFFSET $4`,
+					language, "%"+q+"%", limit, offset,
+				)
+			}
+
 			if err == nil {
 				defer rows.Close()
 				for rows.Next() {
@@ -168,6 +181,8 @@ func APISearchHandler(w http.ResponseWriter, r *http.Request) {
 						results = append(results, it)
 					}
 				}
+			} else {
+				log.Println("FTS and fallback ILIKE search both failed:", err)
 			}
 		} else {
 			// -----------------------------------------------------------------
@@ -189,6 +204,8 @@ func APISearchHandler(w http.ResponseWriter, r *http.Request) {
 						results = append(results, it)
 					}
 				}
+			} else {
+				log.Println("Basic ILIKE search failed:", err)
 			}
 		}
 
