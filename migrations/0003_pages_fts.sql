@@ -6,12 +6,13 @@ ALTER TABLE pages
     ADD COLUMN IF NOT EXISTS content_tsv tsvector;
 
 -- 2) Populate the tsvector column initially
---    (intentional full-table UPDATE to backfill existing rows)
+--    Only backfill rows where content_tsv is still NULL
 UPDATE pages
 SET content_tsv = to_tsvector(
     'simple',
     coalesce(title, '') || ' ' || coalesce(content, '')
-);
+)
+WHERE content_tsv IS NULL;
 
 -- 3) Create a GIN index for fast FTS
 CREATE INDEX IF NOT EXISTS idx_pages_content_tsv
