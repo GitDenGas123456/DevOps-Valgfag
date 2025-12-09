@@ -12,7 +12,7 @@ services:
     environment:
       PORT: 8080
       APP_ENV: prod
-      # 0 indtil Postgres FTS er implementeret, sæt til 1 når tsvector-search er klar
+      # Set to 0 until Postgres FTS is implemented; set to 1 when tsvector-search is ready
       SEARCH_FTS: 0
       DATABASE_URL: ${DATABASE_URL}
       SESSION_KEY: ${SESSION_KEY}
