@@ -16,6 +16,6 @@ CREATE TABLE IF NOT EXISTS pages (
                    CHECK (language IN ('en', 'da'))
                    DEFAULT 'en',
 
-    last_updated TIMESTAMP,
+    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     content      TEXT NOT NULL
 );
