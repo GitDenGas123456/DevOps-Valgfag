@@ -25,7 +25,7 @@ type User struct {
 // and verifies the password using bcrypt.
 func APILoginHandler(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		// Keep a consistent HTML response instead of JSON for this handler
+		// Render an HTML error page for bad requests
 		renderTemplate(w, r, "login", map[string]any{
 			"Title": loginTitle,
 			"error": "Bad request",
