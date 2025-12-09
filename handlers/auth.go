@@ -1,52 +1,60 @@
 package handlers
 
-// Imports
 import (
 	"net/http"
 
 	"golang.org/x/crypto/bcrypt"
 )
 
-// atrributes for user element
+const (
+	loginTitle    = "Sign In"
+	registerTitle = "Sign Up"
+)
+
+// User represents the user object returned from the database.
+// The Password field contains a bcrypt hash (never a plaintext password).
 type User struct {
 	ID       int
 	Username string
 	Email    string
-	Password string // bcrypt hash
+	Password string
 }
 
-// Api handler for login
+// APILoginHandler handles user login requests.
+// It validates the incoming form, checks the database for a matching user,
+// and verifies the password using bcrypt.
 func APILoginHandler(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "bad form"})
+		// Render an HTML error page for bad requests
+		renderTemplate(w, r, "login", map[string]any{
+			"Title": loginTitle,
+			"error": "Bad request",
+		})
 		return
 	}
 
-	// set values for form
 	username := r.FormValue("username")
 	password := r.FormValue("password")
 
-	// set user value
 	u := User{}
 
-	// Calling for values in database
+	// Query PostgreSQL using parameter placeholder $1
 	err := db.QueryRow(
-		`SELECT id, username, email, password FROM users WHERE username = ?`,
+		`SELECT id, username, email, password FROM users WHERE username = $1`,
 		username,
 	).Scan(&u.ID, &u.Username, &u.Email, &u.Password)
 
-	// Error catch if username not found in database
-	if err != nil {
-		renderTemplate(w, r, "login", map[string]any{"Title": "Sign In", "error": "Invalid username"})
-		return
-	}
-	// Error catch if hashed password not found in database
-	if bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(password)) != nil {
-		renderTemplate(w, r, "login", map[string]any{"Title": "Sign In", "error": "Invalid password", "username": username})
+	// Avoid username enumeration by not distinguishing between "bad user" and "bad password"
+	if err != nil || bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(password)) != nil {
+		renderTemplate(w, r, "login", map[string]any{
+			"Title":    loginTitle,
+			"error":    "Invalid username or password",
+			"username": username,
+		})
 		return
 	}
 
-	// Start session for logged in user
+	// Create a session for the authenticated user
 	sess, _ := sessionStore.Get(r, "session")
 	sess.Values["user_id"] = u.ID
 	_ = sess.Save(r, w)
@@ -54,65 +62,98 @@ func APILoginHandler(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/", http.StatusFound)
 }
 
-// API for handling registration
+// APIRegisterHandler handles new user registration.
+// It validates input, checks for existing usernames, hashes the password,
+// and inserts the user into PostgreSQL.
 func APIRegisterHandler(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "bad form"})
+		// Same contract as login: HTML, not JSON
+		renderTemplate(w, r, "register", map[string]any{
+			"Title": registerTitle,
+			"error": "Bad request",
+		})
 		return
 	}
 
-	// Atrributd used for user element
 	username := r.FormValue("username")
 	email := r.FormValue("email")
 	pw1 := r.FormValue("password")
 	pw2 := r.FormValue("password2")
 
-	// Error catch for possible empty fields when trying to register
+	// Basic validation for required fields
 	if username == "" || email == "" || pw1 == "" {
-		renderTemplate(w, r, "register", map[string]any{"Title": "Sign Up", "error": "All fields required"})
+		renderTemplate(w, r, "register", map[string]any{
+			"Title": registerTitle,
+			"error": "All fields required",
+		})
 		return
 	}
 
-	// Error catch for non matching passwords in registration
+	// Password confirmation check
 	if pw1 != pw2 {
-		renderTemplate(w, r, "register", map[string]any{"Title": "Sign Up", "error": "Password do not match"})
+		renderTemplate(w, r, "register", map[string]any{
+			"Title": registerTitle,
+			"error": "Passwords do not match",
+		})
 		return
 	}
 
-	// Checking if user username already exists
+	// Check if username already exists
 	var exists int
-	_ = db.QueryRow(`SELECT COUNT(*) FROM users WHERE username = ?`, username).Scan(&exists)
+	err := db.QueryRow(
+		`SELECT COUNT(*) FROM users WHERE username = $1`,
+		username,
+	).Scan(&exists)
+
+	if err != nil {
+		renderTemplate(w, r, "register", map[string]any{
+			"Title": registerTitle,
+			"error": "Database error",
+		})
+		return
+	}
+
 	if exists > 0 {
-		renderTemplate(w, r, "register", map[string]any{"Title": "Sign Up", "error": "Registration failed, Username already in use"})
+		renderTemplate(w, r, "register", map[string]any{
+			"Title": registerTitle,
+			"error": "Username already in use",
+		})
 		return
 	}
 
-	// Generating hash for password for extra security
-	hash, _ := bcrypt.GenerateFromPassword([]byte(pw1), bcrypt.DefaultCost)
+	// Hash the password using bcrypt
+	hash, err := bcrypt.GenerateFromPassword([]byte(pw1), bcrypt.DefaultCost)
+	if err != nil {
+		renderTemplate(w, r, "register", map[string]any{
+			"Title": registerTitle,
+			"error": "Internal error, please try again",
+		})
+		return
+	}
 
-	//Inserts user into database table and error catch for failed registration
-	if _, err := db.Exec(
-		`INSERT INTO users (username, email, password) VALUES (?, ?, ?)`,
+	// Insert new user into PostgreSQL
+	_, err = db.Exec(
+		`INSERT INTO users (username, email, password) VALUES ($1, $2, $3)`,
 		username, email, string(hash),
-	); err != nil {
-		renderTemplate(w, r, "register", map[string]any{"Title": "Sign Up", "error": "Registration failed"})
+	)
+
+	if err != nil {
+		renderTemplate(w, r, "register", map[string]any{
+			"Title": registerTitle,
+			"error": "Registration failed",
+		})
 		return
 	}
 
-	// Directing to login page after succesful registration
+	// Redirect to login page after successful registration
 	http.Redirect(w, r, "/login", http.StatusFound)
 }
 
-// API for log out handler 
+// APILogoutHandler logs out the user by removing the session value.
 func APILogoutHandler(w http.ResponseWriter, r *http.Request) {
-
-	// Calls session id
 	sess, _ := sessionStore.Get(r, "session")
-
-	// Deletes session from user and saves 
 	delete(sess.Values, "user_id")
 	_ = sess.Save(r, w)
 
-	// Redirects to main page after log out
 	http.Redirect(w, r, "/", http.StatusFound)
 }

@@ -18,3 +18,5 @@ legacy
 
 # sqlite seed
 /data/seed/*.db
+
+

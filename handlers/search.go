@@ -18,7 +18,7 @@ func EnableFTSSearch(on bool) {
 	useFTSSearch = on
 }
 
-// SearchResult represents a single search result row
+// SearchResult represents a single search result row.
 type SearchResult struct {
 	ID          int
 	Title       string
@@ -27,9 +27,12 @@ type SearchResult struct {
 	Description string
 }
 
-// SearchPageHandler renders the web search page and results
+// -----------------------------------------------------------------------------
+// WEB PAGE SEARCH HANDLER (PostgreSQL-compatible)
+// -----------------------------------------------------------------------------
 func SearchPageHandler(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query().Get("q")
+
 	var timer *prometheus.Timer
 	if q != "" {
 		metrics.SearchTotal.Inc()
@@ -43,6 +46,8 @@ func SearchPageHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var results []SearchResult
+
+	// BASIC SEARCH (ILIKE for PostgreSQL)
 	if q != "" {
 		// ---------------------------
 		// Stage 1 - Local search in pages
@@ -50,11 +55,13 @@ func SearchPageHandler(w http.ResponseWriter, r *http.Request) {
 		rows, err := db.Query(
 			`SELECT id, title, url, language, content
 			 FROM pages
-			 WHERE language = ? AND (title LIKE ? OR content LIKE ?)`,
-			language, "%"+q+"%", "%"+q+"%",
+			 WHERE language = $1 
+			   AND (title ILIKE $2 OR content ILIKE $2)`,
+			language, "%"+q+"%",
 		)
 		if err == nil {
-			defer func() { _ = rows.Close() }()
+			defer rows.Close()
+
 			for rows.Next() {
 				var it SearchResult
 				if err := rows.Scan(&it.ID, &it.Title, &it.URL, &it.Language, &it.Description); err == nil {
@@ -113,9 +120,12 @@ func SearchPageHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// APISearchHandler returns JSON-formatted search results
+// -----------------------------------------------------------------------------
+// API SEARCH HANDLER (PostgreSQL-compatible)
+// -----------------------------------------------------------------------------
 func APISearchHandler(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query().Get("q")
+
 	var timer *prometheus.Timer
 	if q != "" {
 		metrics.SearchTotal.Inc()
@@ -129,65 +139,73 @@ func APISearchHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var results []SearchResult
+
 	if q != "" {
 		const limit = 10
 		const offset = 0
 
-		likeQuery := `
-SELECT id, title, url, language, content
-FROM pages
-WHERE language = ? AND (title LIKE ? OR content LIKE ?)`
-
-		// ---------------------------
-		// Stage 1 - Local search (FTS or LIKE)
-		// ---------------------------
+		// ---------------------------------------------------------------------
+		// FTS SEARCH (PostgreSQL content_tsv)
+		// ---------------------------------------------------------------------
 		if useFTSSearch {
-			// FTS-powered search when enabled
+			// Use a CTE so plainto_tsquery($2) is parsed only once.
 			ftsQuery := `
-SELECT p.id,
-       p.title,
-       p.url,
-       p.language,
-       p.content,
-       bm25(pages_fts) AS rank
-FROM pages_fts
-JOIN pages p ON p.id = pages_fts.rowid
-WHERE p.language = ? AND pages_fts MATCH ?
-ORDER BY rank ASC
-LIMIT ? OFFSET ?;`
+				WITH q AS (SELECT plainto_tsquery($2) AS query)
+				SELECT id, title, url, language, content
+				FROM pages, q
+				WHERE language = $1
+				  AND content_tsv @@ q.query
+				ORDER BY ts_rank(content_tsv, q.query) DESC
+				LIMIT $3 OFFSET $4;
+			`
+
 			rows, err := db.Query(ftsQuery, language, q, limit, offset)
 			if err != nil {
-				log.Println("FTS search error, falling back to LIKE:", err)
-				rows, err = db.Query(likeQuery, language, "%"+q+"%", "%"+q+"%")
-				if err == nil {
-					defer func() { _ = rows.Close() }()
-					for rows.Next() {
-						var it SearchResult
-						if err := rows.Scan(&it.ID, &it.Title, &it.URL, &it.Language, &it.Description); err == nil {
-							results = append(results, it)
-						}
-					}
-				}
-			} else {
-				defer func() { _ = rows.Close() }()
-				for rows.Next() {
-					var it SearchResult
-					var rank float64
-					if err := rows.Scan(&it.ID, &it.Title, &it.URL, &it.Language, &it.Description, &rank); err == nil {
-						results = append(results, it)
-					}
-				}
+				// Fallback to ILIKE if FTS fails (e.g. missing tsvector, bad query)
+				log.Println("FTS search error, falling back to ILIKE:", err)
+				rows, err = db.Query(
+					`SELECT id, title, url, language, content
+					 FROM pages
+					 WHERE language = $1
+					   AND (title ILIKE $2 OR content ILIKE $2)
+					 LIMIT $3 OFFSET $4`,
+					language, "%"+q+"%", limit, offset,
+				)
 			}
-		} else {
-			rows, err := db.Query(likeQuery, language, "%"+q+"%", "%"+q+"%")
+
 			if err == nil {
-				defer func() { _ = rows.Close() }()
+				defer rows.Close()
 				for rows.Next() {
 					var it SearchResult
 					if err := rows.Scan(&it.ID, &it.Title, &it.URL, &it.Language, &it.Description); err == nil {
 						results = append(results, it)
 					}
 				}
+			} else {
+				log.Println("FTS and fallback ILIKE search both failed:", err)
+			}
+		} else {
+			// -----------------------------------------------------------------
+			// BASIC SEARCH (ILIKE)
+			// -----------------------------------------------------------------
+			rows, err := db.Query(
+				`SELECT id, title, url, language, content
+				 FROM pages
+				 WHERE language = $1
+				   AND (title ILIKE $2 OR content ILIKE $2)
+				 LIMIT $3 OFFSET $4`,
+				language, "%"+q+"%", limit, offset,
+			)
+			if err == nil {
+				defer rows.Close()
+				for rows.Next() {
+					var it SearchResult
+					if err := rows.Scan(&it.ID, &it.Title, &it.URL, &it.Language, &it.Description); err == nil {
+						results = append(results, it)
+					}
+				}
+			} else {
+				log.Println("Basic ILIKE search failed:", err)
 			}
 		}
 
