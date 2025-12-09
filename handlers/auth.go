@@ -62,7 +62,7 @@ func APILoginHandler(w http.ResponseWriter, r *http.Request) {
 // and inserts the user into PostgreSQL.
 func APIRegisterHandler(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		// Samme kontrakt som login: HTML, ikke JSON
+		// Same contract as login: HTML, not JSON
 		renderTemplate(w, r, "register", map[string]any{
 			"Title": "Sign Up",
 			"error": "Bad request",
