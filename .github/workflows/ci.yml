@@ -61,11 +61,6 @@ jobs:
           version: latest
           args: ./...
 
-      - name: Run DB migrations (Postgres)
-        env:
-          DATABASE_URL: postgres://${{ vars.CI_POSTGRES_USER }}:${{ secrets.CI_POSTGRES_PASSWORD }}@localhost:5432/${{ vars.CI_POSTGRES_DB }}?sslmode=disable
-        run: echo "Migrations handled by app at container startup"
-
       - name: Run tests (race + coverage)
         env:
           DATABASE_URL: postgres://${{ vars.CI_POSTGRES_USER }}:${{ secrets.CI_POSTGRES_PASSWORD }}@localhost:5432/${{ vars.CI_POSTGRES_DB }}?sslmode=disable
@@ -131,11 +126,6 @@ jobs:
           go-version: "1.25.x"
           check-latest: true
           cache: true
-
-      - name: Run DB migrations (Postgres)
-        env:
-          DATABASE_URL: postgres://${{ vars.CI_POSTGRES_USER }}:${{ secrets.CI_POSTGRES_PASSWORD }}@localhost:5432/${{ vars.CI_POSTGRES_DB }}?sslmode=disable
-        run: echo "Migrations handled by app at container startup"
 
       - name: Build server
         run: go build -o server ./cmd/server
@@ -217,10 +207,11 @@ jobs:
             set -e
 
             echo "==> Går til app-mappe på VM..."
-            cd /home/devops/whoknows   # RET hvis din sti er anderledes
+            cd ${{ vars.DEPLOY_PATH }}
 
-            echo "==> Henter seneste compose + config fra main..."
-            git pull origin main
+            echo "==> Sync repo to origin/main..."
+            git fetch origin main
+            git reset --hard origin/main
 
             echo "==> Puller seneste image fra GHCR..."
             docker compose pull
