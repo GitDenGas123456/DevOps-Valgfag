@@ -33,6 +33,7 @@ END
 $$ LANGUAGE plpgsql;
 
 -- 5) Trigger to keep content_tsv in sync
-CREATE TRIGGER IF NOT EXISTS pages_tsvector_update
+DROP TRIGGER IF EXISTS pages_tsvector_update ON pages;
+CREATE TRIGGER pages_tsvector_update
 BEFORE INSERT OR UPDATE ON pages
 FOR EACH ROW EXECUTE FUNCTION pages_tsv_trigger();
