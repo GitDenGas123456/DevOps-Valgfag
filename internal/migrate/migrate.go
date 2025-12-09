@@ -9,14 +9,13 @@ import (
 	"strings"
 )
 
-// RunMigrations applies all .sql files in the migrations/ folder in
-// alphabetical order. Each migration is executed in a transaction and
-// recorded in the schema_migrations table.
+// RunMigrations applies all pending .sql migrations found in the migrations/ folder.
+// Each migration is executed in a transaction and recorded in schema_migrations.
 func RunMigrations(db *sql.DB) error {
 	// Ensure schema_migrations exists
 	_, err := db.Exec(`
 		CREATE TABLE IF NOT EXISTS schema_migrations (
-			version TEXT PRIMARY KEY
+			version VARCHAR(255) PRIMARY KEY
 		);
 	`)
 	if err != nil {
@@ -79,7 +78,6 @@ func RunMigrations(db *sql.DB) error {
 		}
 
 		if err := tx.Commit(); err != nil {
-			_ = tx.Rollback()
 			return fmt.Errorf("failed to commit transaction for migration %s: %w", version, err)
 		}
 	}
