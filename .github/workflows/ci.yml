@@ -203,6 +203,7 @@ jobs:
           host: ${{ vars.PROD_SSH_HOST }}
           username: ${{ vars.PROD_SSH_USER }}
           key: ${{ secrets.PROD_SSH_KEY }}
+          port: ${{ vars.PROD_SSH_PORT }}
           script: |
             set -e
 
