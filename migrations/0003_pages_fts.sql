@@ -23,7 +23,8 @@ CREATE OR REPLACE FUNCTION pages_tsv_trigger()
 RETURNS trigger AS $$
 BEGIN
   NEW.content_tsv :=
-    to_tsvector('simple',
+    to_tsvector(
+      'simple',
       coalesce(NEW.title, '') || ' ' || coalesce(NEW.content, '')
     );
   RETURN NEW;
@@ -31,6 +32,6 @@ END
 $$ LANGUAGE plpgsql;
 
 -- 5) Trigger to keep content_tsv in sync
-CREATE TRIGGER pages_tsvector_update
+CREATE TRIGGER IF NOT EXISTS pages_tsvector_update
 BEFORE INSERT OR UPDATE ON pages
 FOR EACH ROW EXECUTE FUNCTION pages_tsv_trigger();
