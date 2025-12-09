@@ -6,6 +6,11 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+const (
+	loginTitle    = "Sign In"
+	registerTitle = "Sign Up"
+)
+
 // User represents the user object returned from the database.
 // The Password field contains a bcrypt hash (never a plaintext password).
 type User struct {
@@ -22,7 +27,7 @@ func APILoginHandler(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		// Keep a consistent HTML response instead of JSON for this handler
 		renderTemplate(w, r, "login", map[string]any{
-			"Title": "Sign In",
+			"Title": loginTitle,
 			"error": "Bad request",
 		})
 		return
@@ -42,7 +47,7 @@ func APILoginHandler(w http.ResponseWriter, r *http.Request) {
 	// Avoid username enumeration by not distinguishing between "bad user" and "bad password"
 	if err != nil || bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(password)) != nil {
 		renderTemplate(w, r, "login", map[string]any{
-			"Title":    "Sign In",
+			"Title":    loginTitle,
 			"error":    "Invalid username or password",
 			"username": username,
 		})
@@ -64,7 +69,7 @@ func APIRegisterHandler(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		// Same contract as login: HTML, not JSON
 		renderTemplate(w, r, "register", map[string]any{
-			"Title": "Sign Up",
+			"Title": registerTitle,
 			"error": "Bad request",
 		})
 		return
@@ -78,7 +83,7 @@ func APIRegisterHandler(w http.ResponseWriter, r *http.Request) {
 	// Basic validation for required fields
 	if username == "" || email == "" || pw1 == "" {
 		renderTemplate(w, r, "register", map[string]any{
-			"Title": "Sign Up",
+			"Title": registerTitle,
 			"error": "All fields required",
 		})
 		return
@@ -87,7 +92,7 @@ func APIRegisterHandler(w http.ResponseWriter, r *http.Request) {
 	// Password confirmation check
 	if pw1 != pw2 {
 		renderTemplate(w, r, "register", map[string]any{
-			"Title": "Sign Up",
+			"Title": registerTitle,
 			"error": "Passwords do not match",
 		})
 		return
@@ -102,7 +107,7 @@ func APIRegisterHandler(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		renderTemplate(w, r, "register", map[string]any{
-			"Title": "Sign Up",
+			"Title": registerTitle,
 			"error": "Database error",
 		})
 		return
@@ -110,7 +115,7 @@ func APIRegisterHandler(w http.ResponseWriter, r *http.Request) {
 
 	if exists > 0 {
 		renderTemplate(w, r, "register", map[string]any{
-			"Title": "Sign Up",
+			"Title": registerTitle,
 			"error": "Username already in use",
 		})
 		return
@@ -120,7 +125,7 @@ func APIRegisterHandler(w http.ResponseWriter, r *http.Request) {
 	hash, err := bcrypt.GenerateFromPassword([]byte(pw1), bcrypt.DefaultCost)
 	if err != nil {
 		renderTemplate(w, r, "register", map[string]any{
-			"Title": "Sign Up",
+			"Title": registerTitle,
 			"error": "Internal error, please try again",
 		})
 		return
@@ -134,7 +139,7 @@ func APIRegisterHandler(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		renderTemplate(w, r, "register", map[string]any{
-			"Title": "Sign Up",
+			"Title": registerTitle,
 			"error": "Registration failed",
 		})
 		return
