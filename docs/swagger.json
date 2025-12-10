@@ -9,6 +9,19 @@
   "host": "",
   "basePath": "/",
   "schemes": [],
+  "securityDefinitions": {
+    "sessionAuth": {
+      "type": "apiKey",
+      "name": "session",
+      "in": "cookie",
+      "description": "Session cookie authentication set by /api/login."
+    }
+  },
+  "security": [
+    {
+      "sessionAuth": []
+    }
+  ],
   "paths": {
     "/about": {
       "get": {
@@ -19,6 +32,7 @@
           "Pages"
         ],
         "summary": "Serve About Page",
+        "security": [],
         "responses": {
           "200": {
             "description": "HTML content",
@@ -42,6 +56,7 @@
           "API"
         ],
         "summary": "Login",
+        "security": [],
         "parameters": [
           {
             "type": "string",
@@ -114,6 +129,7 @@
           "API"
         ],
         "summary": "Register",
+        "security": [],
         "parameters": [
           {
             "type": "string",
@@ -225,6 +241,7 @@
           "Health"
         ],
         "summary": "Liveness probe",
+        "security": [],
         "responses": {
           "200": {
             "description": "Service is healthy",
@@ -248,6 +265,7 @@
           "Pages"
         ],
         "summary": "Serve Login Page",
+        "security": [],
         "responses": {
           "200": {
             "description": "HTML content",
@@ -267,6 +285,7 @@
           "Health"
         ],
         "summary": "Readiness probe",
+        "security": [],
         "responses": {
           "200": {
             "description": "Database connection is ready",
@@ -294,6 +313,7 @@
           "Pages"
         ],
         "summary": "Serve Register Page",
+        "security": [],
         "responses": {
           "200": {
             "description": "HTML content",
