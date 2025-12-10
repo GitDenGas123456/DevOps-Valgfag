@@ -1,3 +1,5 @@
+version: "3.9"
+
 services:
   whoknows-app:
     build:
@@ -10,12 +12,14 @@ services:
     env_file:
       - .env
     environment:
-      # vi lader .env styre resten (SESSION_KEY, DMI_API_KEY osv),
-      # men DATABASE_URL sætter vi hårdt her til den rigtige host
+      # We let .env control most settings (SESSION_KEY, DMI_API_KEY, etc.)
+      # The app constructs its own PostgreSQL DSN from POSTGRES_* (and DB_HOST) via resolvePostgresDSN.
       PORT: 8080
       APP_ENV: prod
+      # Set to 0 until Postgres FTS is implemented; set to 1 when tsvector search is ready
       SEARCH_FTS: 0
-      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres_db:${POSTGRES_PORT:-5432}/${POSTGRES_DB}?sslmode=disable
+      # Explicitly tell the app which host to use for Postgres (matches the service name below)
+      DB_HOST: postgres_db
       SESSION_KEY: ${SESSION_KEY}
       DMI_API_KEY: ${DMI_API_KEY}
     depends_on:
@@ -39,7 +43,7 @@ services:
       timeout: 5s
       retries: 5
     ports:
-      - "5432:5432"   # kan fjernes i "rigtig" prod, men er nice til udvikling
+      - "5432:5432"   # Can be removed in production, but useful for development
     volumes:
       - postgres-data:/var/lib/postgresql/data
 
