@@ -1,6 +1,6 @@
 swagger: "2.0"
 info:
-  description: API for the WhoKnows web app: session auth, search content, weather forecast, and health/readiness probes.
+  description: "API for the WhoKnows web app: session auth, search content, weather forecast, and health/readiness probes."
   title: WhoKnows API
   contact: {}
   version: 0.1.0

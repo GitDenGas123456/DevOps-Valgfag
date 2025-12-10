@@ -15,7 +15,7 @@ services:
       PORT: 8080
       APP_ENV: prod
       SEARCH_FTS: 0
-      DATABASE_URL: postgres://devops:devops@postgres_db:5432/whoknows?sslmode=disable
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres_db:${POSTGRES_PORT:-5432}/${POSTGRES_DB}?sslmode=disable
       SESSION_KEY: ${SESSION_KEY}
       DMI_API_KEY: ${DMI_API_KEY}
     depends_on:

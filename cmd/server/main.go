@@ -190,7 +190,14 @@ func buildPostgresDSN(host, source string) (string, dsnMeta) {
 	pass := getenv("POSTGRES_PASSWORD", "devops")
 	dbName := getenv("POSTGRES_DB", "whoknows")
 
-	dsn := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable", user, pass, host, port, dbName)
+	dsn := fmt.Sprintf(
+		"postgres://%s:%s@%s:%s/%s?sslmode=disable",
+		url.QueryEscape(user),
+		url.QueryEscape(pass),
+		host,
+		port,
+		dbName,
+	)
 	return dsn, dsnMeta{
 		Source: source,
 		Host:   host,
