@@ -55,14 +55,7 @@ func Seed(database *sql.DB) error {
 		}
 	}
 
-	// Dev/test-only default admin user
-	if _, err := database.Exec(`
-INSERT OR IGNORE INTO users (username, email, password)
-VALUES ('admin', 'dev@example.com',
-'$2a$10$wHgFJ4EvAty4/nXZ7LxROulqfEUvvVdHRK3g.B40VgTfZ2.PU6vSm');
-`); err != nil {
-		return err
-	}
+	// No default admin user seeded anymore – avoids hard-coded bcrypt hash.
 
 	return nil
 }
