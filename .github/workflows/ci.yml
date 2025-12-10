@@ -17,16 +17,17 @@ jobs:
   build:
     env:
       POSTGRES_USER: ${{ vars.CI_POSTGRES_USER || 'devops' }}
-      POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD || 'devops' }}
+      POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD }}
       POSTGRES_DB: ${{ vars.CI_POSTGRES_DB || 'whoknows' }}
     runs-on: ubuntu-latest
     services:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_USER: ${{ env.POSTGRES_USER }}
-          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
-          POSTGRES_DB: ${{ env.POSTGRES_DB }}
+          # vigtige: env.* virker IKKE her, så vi gentager expressions
+          POSTGRES_USER: ${{ vars.CI_POSTGRES_USER || 'devops' }}
+          POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ vars.CI_POSTGRES_DB || 'whoknows' }}
         ports:
           - 5432:5432
         options: >-
@@ -67,6 +68,7 @@ jobs:
 
       - name: Run tests (race + coverage)
         env:
+          # her må vi godt bruge env.*, de kommer fra job-level env
           DATABASE_URL: postgres://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@localhost:5432/${{ env.POSTGRES_DB }}?sslmode=disable
         run: |
           go test -v -race ./... \
@@ -107,15 +109,15 @@ jobs:
     needs: build
     env:
       POSTGRES_USER: ${{ vars.CI_POSTGRES_USER || 'devops' }}
-      POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD || 'devops' }}
+      POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD }}
       POSTGRES_DB: ${{ vars.CI_POSTGRES_DB || 'whoknows' }}
     services:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_USER: ${{ env.POSTGRES_USER }}
-          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
-          POSTGRES_DB: ${{ env.POSTGRES_DB }}
+          POSTGRES_USER: ${{ vars.CI_POSTGRES_USER || 'devops' }}
+          POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ vars.CI_POSTGRES_DB || 'whoknows' }}
         ports:
           - 5432:5432
         options: >-
