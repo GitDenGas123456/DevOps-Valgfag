@@ -93,6 +93,7 @@
           "API"
         ],
         "summary": "Logout",
+        "security": [],
         "responses": {
           "302": {
             "description": "Redirect to / after logout"
@@ -109,6 +110,7 @@
           "API"
         ],
         "summary": "Logout",
+        "security": [],
         "responses": {
           "302": {
             "description": "Redirect to / after logout"
