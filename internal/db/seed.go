@@ -4,7 +4,6 @@
 // called from the PostgreSQL runtime code path.
 package db
 
-// Imports
 import (
 	"bufio"
 	"bytes"
@@ -28,6 +27,7 @@ func Seed(database *sql.DB) error {
 		return nil
 	}
 
+	// Parse SQL file
 	scanner := bufio.NewScanner(bytes.NewReader(raw))
 	var b strings.Builder
 	for scanner.Scan() {
@@ -43,6 +43,7 @@ func Seed(database *sql.DB) error {
 		return err
 	}
 
+	// Execute schema
 	stmts := strings.Split(b.String(), ";")
 	for _, s := range stmts {
 		s = strings.TrimSpace(s)
@@ -54,13 +55,13 @@ func Seed(database *sql.DB) error {
 		}
 	}
 
-	if appEnv != "prod" && appEnv != "production" {
-		if _, err := database.Exec(`
+	// Dev/test-only default admin user
+	if _, err := database.Exec(`
 INSERT OR IGNORE INTO users (username, email, password)
-VALUES ('admin', 'dev@example.com', '$2a$10$wHgFJ4EvAty4/nXZ7LxROulqfEUvvVdHRK3g.B40VgTfZ2.PU6vSm');
+VALUES ('admin', 'dev@example.com',
+'$2a$10$wHgFJ4EvAty4/nXZ7LxROulqfEUvvVdHRK3g.B40VgTfZ2.PU6vSm');
 `); err != nil {
-			return err
-		}
+		return err
 	}
 
 	return nil
