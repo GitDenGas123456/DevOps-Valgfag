@@ -14,7 +14,10 @@ import (
 var useFTSSearch bool
 var externalEnabled = true
 
-const pageLimit = 50
+const (
+	pageLimit       = 50
+	rowsCloseErrMsg = "rows.Close error:"
+)
 
 // EnableFTSSearch toggles FTS usage for search endpoints.
 func EnableFTSSearch(on bool) {
@@ -71,7 +74,7 @@ func SearchPageHandler(w http.ResponseWriter, r *http.Request) {
 		if err == nil {
 			defer func() {
 				if err := rows.Close(); err != nil {
-					log.Println("rows.Close error:", err)
+					log.Println(rowsCloseErrMsg, err)
 				}
 			}()
 
@@ -191,7 +194,7 @@ func APISearchHandler(w http.ResponseWriter, r *http.Request) {
 			if err == nil {
 				defer func() {
 					if err := rows.Close(); err != nil {
-						log.Println("rows.Close error:", err)
+						log.Println(rowsCloseErrMsg, err)
 					}
 				}()
 				for rows.Next() {
@@ -218,7 +221,7 @@ func APISearchHandler(w http.ResponseWriter, r *http.Request) {
 			if err == nil {
 				defer func() {
 					if err := rows.Close(); err != nil {
-						log.Println("rows.Close error:", err)
+						log.Println(rowsCloseErrMsg, err)
 					}
 				}()
 				for rows.Next() {
