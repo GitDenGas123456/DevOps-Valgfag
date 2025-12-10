@@ -1,5 +1,4 @@
 swagger: "2.0"
-
 info:
   description: "API for the WhoKnows web app: session auth, search content, weather forecast, and health/readiness probes."
   title: WhoKnows API
@@ -17,12 +16,14 @@ securityDefinitions:
     name: session
     description: Session-based authentication set via /api/login endpoint.
 
+# Global rule: alt kræver session-cookie, medmindre der står security: []
 security:
   - CookieAuth: []
 
 paths:
   /about:
     get:
+      security: []  # Public
       produces:
         - text/html
       tags:
@@ -36,6 +37,7 @@ paths:
 
   /api/login:
     post:
+      security: []  # Public
       description: Authenticate a user with username and password. Sets a session cookie and redirects to the home page on success.
       consumes:
         - application/x-www-form-urlencoded
@@ -45,16 +47,16 @@ paths:
         - API
       summary: Login
       parameters:
-        - type: string
+        - name: username
+          in: formData
           description: Username
-          name: username
-          in: formData
           required: true
-        - type: string
+          type: string
+        - name: password
+          in: formData
           description: Password
-          name: password
-          in: formData
           required: true
+          type: string
       responses:
         "302":
           description: Redirect to / after successful login
@@ -63,6 +65,7 @@ paths:
 
   /api/logout:
     get:
+      security: []  # Public
       description: Log out the current user by clearing the session cookie.
       produces:
         - text/html
@@ -73,8 +76,9 @@ paths:
         "302":
           description: Redirect to / after logout
     post:
+      security: []  # Public
+      consumes: []  # eksplicit ingen body
       description: Log out the current user by clearing the session cookie.
-      consumes: []   # eksplicit ingen body
       produces:
         - text/html
       tags:
@@ -86,6 +90,7 @@ paths:
 
   /api/register:
     post:
+      security: []  # Public
       description: Register a new user. On success the client is redirected to /login.
       consumes:
         - application/x-www-form-urlencoded
@@ -95,26 +100,26 @@ paths:
         - API
       summary: Register
       parameters:
-        - type: string
+        - name: username
+          in: formData
           description: Username
-          name: username
-          in: formData
           required: true
-        - type: string
+          type: string
+        - name: email
+          in: formData
           description: Email address
-          name: email
-          in: formData
           required: true
-        - type: string
+          type: string
+        - name: password
+          in: formData
           description: Password
-          name: password
-          in: formData
           required: true
-        - type: string
+          type: string
+        - name: password2
+          in: formData
           description: Password confirmation
-          name: password2
-          in: formData
           required: true
+          type: string
       responses:
         "302":
           description: Redirect to /login after successful registration
@@ -123,6 +128,7 @@ paths:
 
   /api/search:
     get:
+      # Ingen security-override -> kræver session-cookie
       description: Search for stored pages and cached Wikipedia content. When the query is empty, an empty result set is returned.
       produces:
         - application/json
@@ -130,16 +136,16 @@ paths:
         - API
       summary: Search
       parameters:
-        - type: string
+        - name: q
+          in: query
           description: Search query string
-          name: q
-          in: query
           required: false
-        - type: string
-          description: Language code (default: en)
-          name: language
+          type: string
+        - name: language
           in: query
+          description: "Language code (default: en)"
           required: false
+          type: string
       responses:
         "200":
           description: Search results
@@ -148,6 +154,7 @@ paths:
 
   /api/weather:
     get:
+      # Ingen security-override -> kræver session-cookie
       description: Returns the current Copenhagen forecast used by the /weather page.
       produces:
         - application/json
@@ -166,6 +173,7 @@ paths:
 
   /healthz:
     get:
+      security: []  # Public
       produces:
         - text/plain
       tags:
@@ -182,6 +190,7 @@ paths:
 
   /login:
     get:
+      security: []  # Public
       produces:
         - text/html
       tags:
@@ -195,6 +204,7 @@ paths:
 
   /readyz:
     get:
+      security: []  # Public
       produces:
         - text/plain
       tags:
@@ -214,6 +224,7 @@ paths:
 
   /register:
     get:
+      security: []  # Public
       produces:
         - text/html
       tags:
