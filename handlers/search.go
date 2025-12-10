@@ -69,7 +69,11 @@ func SearchPageHandler(w http.ResponseWriter, r *http.Request) {
 			language, "%"+q+"%", pageLimit,
 		)
 		if err == nil {
-			defer rows.Close()
+			defer func() {
+				if err := rows.Close(); err != nil {
+					log.Println("rows.Close error:", err)
+				}
+			}()
 
 			for rows.Next() {
 				var it SearchResult
@@ -185,7 +189,11 @@ func APISearchHandler(w http.ResponseWriter, r *http.Request) {
 			}
 
 			if err == nil {
-				defer rows.Close()
+				defer func() {
+					if err := rows.Close(); err != nil {
+						log.Println("rows.Close error:", err)
+					}
+				}()
 				for rows.Next() {
 					var it SearchResult
 					if err := rows.Scan(&it.ID, &it.Title, &it.URL, &it.Language, &it.Description); err == nil {
@@ -208,7 +216,11 @@ func APISearchHandler(w http.ResponseWriter, r *http.Request) {
 				language, "%"+q+"%", limit, offset,
 			)
 			if err == nil {
-				defer rows.Close()
+				defer func() {
+					if err := rows.Close(); err != nil {
+						log.Println("rows.Close error:", err)
+					}
+				}()
 				for rows.Next() {
 					var it SearchResult
 					if err := rows.Scan(&it.ID, &it.Title, &it.URL, &it.Language, &it.Description); err == nil {

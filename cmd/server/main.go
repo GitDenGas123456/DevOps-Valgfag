@@ -1,6 +1,6 @@
 // @title WhoKnows API
 // @version 0.1.0
-// @description API for the WhoKnows web app: session auth, search content, weather forecast, and health/readiness probes.
+// @description API specification for the WhoKnows web application
 // @BasePath /
 package main
 
@@ -63,15 +63,17 @@ type dsnMeta struct {
 }
 
 func main() {
-	// Set port
+	// HTTP port
 	port := getenv("PORT", "8080")
 
-	// Resolve the database DSN (preferring Docker Compose settings)
+	// Resolve DSN with precedence:
+	// 1) DB_HOST + POSTGRES_* (Docker/VM)
+	// 2) DATABASE_URL
+	// 3) default postgres_db
 	dsn, meta := resolvePostgresDSN()
-
 	log.Printf("Using PostgreSQL DSN (source=%s host=%s db=%s user=%s)", meta.Source, meta.Host, meta.DB, meta.User)
 
-	// Session key + FTS flag
+	// Session key + feature toggles
 	sessionKey := getenv("SESSION_KEY", "")
 	if sessionKey == "" {
 		log.Fatal("SESSION_KEY is required")
@@ -82,22 +84,26 @@ func main() {
 		log.Fatal("SESSION_KEY must be at least 32 bytes in prod")
 	}
 
-	useFTS := getenv("SEARCH_FTS", "0")
+	useFTS := getenv("SEARCH_FTS", "0") == "1"
 	externalSearchEnabled := getenv("EXTERNAL_SEARCH", "1") == "1"
 
-	// Open PostgreSQL
+	// Åbn PostgreSQL via pgx-driveren
 	db, err := sql.Open("pgx", dsn)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer db.Close()
+	defer func() {
+		if cerr := db.Close(); cerr != nil {
+			log.Printf("error closing DB: %v", cerr)
+		}
+	}()
 
 	// Test DB connection
 	if err := db.Ping(); err != nil {
 		log.Fatal("Failed to connect to PostgreSQL:", err)
 	}
 
-	// Run PostgreSQL migrations here
+	// Kør migrations
 	log.Println("Running database migrations...")
 	if err := migrate.RunMigrations(db); err != nil {
 		log.Fatalf("migration error: %v", err)
@@ -117,13 +123,7 @@ func main() {
 
 	// Wire handlers
 	h.Init(db, tmpl, sessionStore)
-
-	// Toggle FTS
-	if useFTS == "1" {
-		h.EnableFTSSearch(true)
-	} else {
-		h.EnableFTSSearch(false)
-	}
+	h.EnableFTSSearch(useFTS)
 	h.EnableExternalSearch(externalSearchEnabled)
 
 	// Router
@@ -136,23 +136,23 @@ func main() {
 	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", fs))
 
 	// Page endpoints
-	r.HandleFunc("/", h.SearchPageHandler).Methods("GET")
-	r.HandleFunc("/about", h.AboutPageHandler).Methods("GET")
-	r.HandleFunc("/login", h.LoginPageHandler).Methods("GET")
-	r.HandleFunc("/register", h.RegisterPageHandler).Methods("GET")
-	r.HandleFunc("/weather", h.WeatherPageHandler).Methods("GET")
+	r.HandleFunc("/", h.SearchPageHandler).Methods(http.MethodGet)
+	r.HandleFunc("/about", h.AboutPageHandler).Methods(http.MethodGet)
+	r.HandleFunc("/login", h.LoginPageHandler).Methods(http.MethodGet)
+	r.HandleFunc("/register", h.RegisterPageHandler).Methods(http.MethodGet)
+	r.HandleFunc("/weather", h.WeatherPageHandler).Methods(http.MethodGet)
 
 	// API endpoints
-	r.HandleFunc("/api/login", h.APILoginHandler).Methods("POST")
-	r.HandleFunc("/api/register", h.APIRegisterHandler).Methods("POST")
-	r.HandleFunc("/api/logout", h.APILogoutHandler).Methods("POST", "GET")
-	r.HandleFunc("/api/search", h.APISearchHandler).Methods("GET", "POST")
-	r.HandleFunc("/api/weather", h.APIWeatherHandler).Methods("GET")
+	r.HandleFunc("/api/login", h.APILoginHandler).Methods(http.MethodPost)
+	r.HandleFunc("/api/register", h.APIRegisterHandler).Methods(http.MethodPost)
+	r.HandleFunc("/api/logout", h.APILogoutHandler).Methods(http.MethodPost, http.MethodGet)
+	// Search is GET-only in swagger + handler
+	r.HandleFunc("/api/search", h.APISearchHandler).Methods(http.MethodGet)
+	// Weather JSON API
+	r.HandleFunc("/api/weather", h.APIWeatherHandler).Methods(http.MethodGet)
 
-	// Health check
+	// Health / readiness
 	r.HandleFunc("/healthz", h.Healthz).Methods(http.MethodGet)
-
-	// Readiness check
 	r.HandleFunc("/readyz", h.Readyz).Methods(http.MethodGet)
 
 	// Metrics endpoint
@@ -166,10 +166,6 @@ func main() {
 	log.Fatal(http.ListenAndServe(":"+port, r))
 }
 
-// resolvePostgresDSN builds the connection string with sensible defaults.
-// If DB_HOST is set (e.g., in Docker Compose), it takes precedence and we assemble
-// the DSN from individual PostgreSQL env vars. Otherwise we honor DATABASE_URL,
-// and finally fall back to a docker-friendly default host.
 func resolvePostgresDSN() (string, dsnMeta) {
 	if host := os.Getenv("DB_HOST"); host != "" {
 		return buildPostgresDSN(host, "DB_HOST")
@@ -178,12 +174,13 @@ func resolvePostgresDSN() (string, dsnMeta) {
 	if dsn := os.Getenv("DATABASE_URL"); dsn != "" {
 		meta, err := extractDSNMeta(dsn)
 		if err != nil {
-			log.Fatal("invalid DATABASE_URL")
+			log.Fatal("invalid DATABASE_URL:", err)
 		}
 		meta.Source = "DATABASE_URL"
 		return dsn, meta
 	}
 
+	// default for docker-compose
 	return buildPostgresDSN("postgres_db", "default")
 }
 

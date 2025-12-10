@@ -1,180 +1,275 @@
-basePath: /
-definitions:
-  main.AuthResponse:
-    properties:
-      message:
-        example: Login successful
-        type: string
-      statusCode:
-        example: 200
-        type: integer
-    type: object
-  main.SearchResponse:
-    properties:
-      search_results:
-        items:
-          $ref: '#/definitions/main.SearchResult'
-        type: array
-    type: object
-  main.SearchResult:
-    properties:
-      content:
-        example: Sample content
-        type: string
-      id:
-        example: 1
-        type: integer
-      language:
-        example: en
-        type: string
-    type: object
+swagger: "2.0"
 info:
-  contact: {}
-  description: Application user with login credentials
+  description: API for the WhoKnows web app: session auth, search content, weather forecast, and health/readiness probes.
   title: WhoKnows API
+  contact: {}
   version: 0.1.0
+host: ""
+basePath: /
+schemes: []
 paths:
   /about:
     get:
       produces:
-      - text/html
+        - text/html
+      tags:
+        - Pages
+      summary: Serve About Page
       responses:
         "200":
           description: HTML content
           schema:
             type: string
-      summary: Serve About Page
-      tags:
-      - Pages
   /api/login:
     post:
+      description: Authenticate a user with username and password. Sets a session cookie and redirects to the home page on success.
       consumes:
-      - application/x-www-form-urlencoded
-      description: Authenticate a user with username and password
-      parameters:
-      - description: Username
-        in: formData
-        name: username
-        required: true
-        type: string
-      - description: Password
-        in: formData
-        name: password
-        required: true
-        type: string
+        - application/x-www-form-urlencoded
       produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/main.AuthResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/main.AuthResponse'
-      summary: Login
+        - text/html
       tags:
-      - API
+        - API
+      summary: Login
+      parameters:
+        - type: string
+          description: Username
+          name: username
+          in: formData
+          required: true
+        - type: string
+          description: Password
+          name: password
+          in: formData
+          required: true
+      responses:
+        "302":
+          description: Redirect to / after successful login
+        "200":
+          description: Login page with validation error
   /api/logout:
     get:
-      description: Log out the current user
+      description: Log out the current user by clearing the session cookie.
       produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/main.AuthResponse'
-      summary: Logout
+        - text/html
       tags:
-      - API
+        - API
+      summary: Logout
+      responses:
+        "302":
+          description: Redirect to / after logout
+    post:
+      description: Log out the current user by clearing the session cookie.
+      produces:
+        - text/html
+      tags:
+        - API
+      summary: Logout
+      responses:
+        "302":
+          description: Redirect to / after logout
   /api/register:
     post:
+      description: Register a new user. On success the client is redirected to /login.
       consumes:
-      - application/x-www-form-urlencoded
-      description: Register a new user
-      parameters:
-      - description: Username
-        in: formData
-        name: username
-        required: true
-        type: string
-      - description: Email
-        in: formData
-        name: email
-        required: true
-        type: string
-      - description: Password
-        in: formData
-        name: password
-        required: true
-        type: string
-      - description: Password Confirmation
-        in: formData
-        name: password2
-        type: string
+        - application/x-www-form-urlencoded
       produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/main.AuthResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/main.AuthResponse'
+        - text/html
+      tags:
+        - API
       summary: Register
-      tags:
-      - API
-  /api/search:
-    post:
-      consumes:
-      - application/json
-      description: Search for content by query and language
       parameters:
-      - description: Search query
-        in: query
-        name: q
-        required: true
-        type: string
-      - description: Language code (e.g., 'en')
-        in: query
-        name: language
-        type: string
+        - type: string
+          description: Username
+          name: username
+          in: formData
+          required: true
+        - type: string
+          description: Email address
+          name: email
+          in: formData
+          required: true
+        - type: string
+          description: Password
+          name: password
+          in: formData
+          required: true
+        - type: string
+          description: Password confirmation
+          name: password2
+          in: formData
+          required: true
+      responses:
+        "302":
+          description: Redirect to /login after successful registration
+        "200":
+          description: Registration page with validation errors
+  /api/search:
+    get:
+      description: Search for stored pages and cached Wikipedia content. When the query is empty, an empty result set is returned.
       produces:
-      - application/json
+        - application/json
+      tags:
+        - API
+      summary: Search
+      parameters:
+        - type: string
+          description: Search query string
+          name: q
+          in: query
+          required: false
+        - type: string
+          description: Language code (default: en)
+          name: language
+          in: query
+          required: false
       responses:
         "200":
-          description: OK
+          description: Search results
           schema:
-            $ref: '#/definitions/main.SearchResponse'
-      summary: Search
+            $ref: '#/definitions/handlers.SearchResponse'
+  /api/weather:
+    get:
+      description: Returns the current Copenhagen forecast used by the /weather page.
+      produces:
+        - application/json
       tags:
-      - API
+        - API
+      summary: Get weather forecast
+      responses:
+        "200":
+          description: Forecast retrieved
+          schema:
+            $ref: '#/definitions/handlers.WeatherAPIResponse'
+        "503":
+          description: Weather service unavailable
+          schema:
+            $ref: '#/definitions/handlers.APIErrorResponse'
+  /healthz:
+    get:
+      produces:
+        - text/plain
+      tags:
+        - Health
+      summary: Liveness probe
+      responses:
+        "200":
+          description: Service is healthy
+          schema:
+            type: string
+            example: ok
+        "500":
+          description: Internal error writing response
   /login:
     get:
       produces:
-      - text/html
+        - text/html
+      tags:
+        - Pages
+      summary: Serve Login Page
       responses:
         "200":
           description: HTML content
           schema:
             type: string
-      summary: Serve Login Page
+  /readyz:
+    get:
+      produces:
+        - text/plain
       tags:
-      - Pages
+        - Health
+      summary: Readiness probe
+      responses:
+        "200":
+          description: Database connection is ready
+          schema:
+            type: string
+            example: ready
+        "503":
+          description: Database not configured or not reachable
+          schema:
+            type: string
+            example: database not ready
   /register:
     get:
       produces:
-      - text/html
+        - text/html
+      tags:
+        - Pages
+      summary: Serve Register Page
       responses:
         "200":
           description: HTML content
           schema:
             type: string
-      summary: Serve Register Page
-      tags:
-      - Pages
-swagger: "2.0"
+definitions:
+  handlers.APIErrorResponse:
+    type: object
+    properties:
+      error:
+        type: string
+        example: weather service unavailable
+  handlers.SearchResponse:
+    type: object
+    properties:
+      search_results:
+        type: array
+        items:
+          $ref: '#/definitions/handlers.SearchResult'
+  handlers.SearchResult:
+    type: object
+    properties:
+      Description:
+        type: string
+        example: Short description
+      ID:
+        type: integer
+        example: 1
+      Language:
+        type: string
+        example: en
+      Title:
+        type: string
+        example: Example page title
+      URL:
+        type: string
+        example: https://example.com
+  handlers.WeatherAPIResponse:
+    type: object
+    properties:
+      forecast:
+        $ref: '#/definitions/handlers.WeatherForecast'
+      location:
+        $ref: '#/definitions/handlers.WeatherLocation'
+  handlers.WeatherForecast:
+    type: object
+    properties:
+      step:
+        type: string
+        example: PT1H
+      temperature:
+        type: number
+        example: 12.3
+      wind_direction:
+        type: number
+        example: 225
+      wind_speed:
+        type: number
+        example: 4.5
+  handlers.WeatherLocation:
+    type: object
+    properties:
+      latitude:
+        type: number
+        example: 55.715
+      longitude:
+        type: number
+        example: 12.561
+  main.AuthResponse:
+    type: object
+    properties:
+      message:
+        type: string
+        example: Login successful
+      statusCode:
+        type: integer
+        example: 200

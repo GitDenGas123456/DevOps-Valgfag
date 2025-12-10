@@ -1,12 +1,14 @@
 {
     "swagger": "2.0",
     "info": {
-        "description": "Application user with login credentials",
+        "description": "API for the WhoKnows web app: session auth, search content, weather forecast, and health/readiness probes.",
         "title": "WhoKnows API",
         "contact": {},
         "version": "0.1.0"
     },
+    "host": "",
     "basePath": "/",
+    "schemes": [],
     "paths": {
         "/about": {
             "get": {
@@ -29,12 +31,12 @@
         },
         "/api/login": {
             "post": {
-                "description": "Authenticate a user with username and password",
+                "description": "Authenticate a user with username and password. Sets a session cookie and redirects to the home page on success.",
                 "consumes": [
                     "application/x-www-form-urlencoded"
                 ],
                 "produces": [
-                    "application/json"
+                    "text/html"
                 ],
                 "tags": [
                     "API"
@@ -57,49 +59,55 @@
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/main.AuthResponse"
-                        }
+                    "302": {
+                        "description": "Redirect to / after successful login"
                     },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/main.AuthResponse"
-                        }
+                    "200": {
+                        "description": "Login page with validation error"
                     }
                 }
             }
         },
         "/api/logout": {
             "get": {
-                "description": "Log out the current user",
+                "description": "Log out the current user by clearing the session cookie.",
                 "produces": [
-                    "application/json"
+                    "text/html"
                 ],
                 "tags": [
                     "API"
                 ],
                 "summary": "Logout",
                 "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/main.AuthResponse"
-                        }
+                    "302": {
+                        "description": "Redirect to / after logout"
+                    }
+                }
+            },
+            "post": {
+                "description": "Log out the current user by clearing the session cookie.",
+                "produces": [
+                    "text/html"
+                ],
+                "tags": [
+                    "API"
+                ],
+                "summary": "Logout",
+                "responses": {
+                    "302": {
+                        "description": "Redirect to / after logout"
                     }
                 }
             }
         },
         "/api/register": {
             "post": {
-                "description": "Register a new user",
+                "description": "Register a new user. On success the client is redirected to /login.",
                 "consumes": [
                     "application/x-www-form-urlencoded"
                 ],
                 "produces": [
-                    "application/json"
+                    "text/html"
                 ],
                 "tags": [
                     "API"
@@ -115,7 +123,7 @@
                     },
                     {
                         "type": "string",
-                        "description": "Email",
+                        "description": "Email address",
                         "name": "email",
                         "in": "formData",
                         "required": true
@@ -129,33 +137,25 @@
                     },
                     {
                         "type": "string",
-                        "description": "Password Confirmation",
+                        "description": "Password confirmation",
                         "name": "password2",
-                        "in": "formData"
+                        "in": "formData",
+                        "required": true
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/main.AuthResponse"
-                        }
+                    "302": {
+                        "description": "Redirect to /login after successful registration"
                     },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/main.AuthResponse"
-                        }
+                    "200": {
+                        "description": "Registration page with validation errors"
                     }
                 }
             }
         },
         "/api/search": {
-            "post": {
-                "description": "Search for content by query and language",
-                "consumes": [
-                    "application/json"
-                ],
+            "get": {
+                "description": "Search for stored pages and cached Wikipedia content. When the query is empty, an empty result set is returned.",
                 "produces": [
                     "application/json"
                 ],
@@ -166,24 +166,74 @@
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Search query",
+                        "description": "Search query string",
                         "name": "q",
                         "in": "query",
-                        "required": true
+                        "required": false
                     },
                     {
                         "type": "string",
-                        "description": "Language code (e.g., 'en')",
+                        "description": "Language code (default: en)",
                         "name": "language",
-                        "in": "query"
+                        "in": "query",
+                        "required": false
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Search results",
                         "schema": {
-                            "$ref": "#/definitions/main.SearchResponse"
+                            "$ref": "#/definitions/handlers.SearchResponse"
                         }
+                    }
+                }
+            }
+        },
+        "/api/weather": {
+            "get": {
+                "description": "Returns the current Copenhagen forecast used by the /weather page.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "API"
+                ],
+                "summary": "Get weather forecast",
+                "responses": {
+                    "200": {
+                        "description": "Forecast retrieved",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.WeatherAPIResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Weather service unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.APIErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/healthz": {
+            "get": {
+                "produces": [
+                    "text/plain"
+                ],
+                "tags": [
+                    "Health"
+                ],
+                "summary": "Liveness probe",
+                "responses": {
+                    "200": {
+                        "description": "Service is healthy",
+                        "schema": {
+                            "type": "string",
+                            "example": "ok"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal error writing response"
                     }
                 }
             }
@@ -202,6 +252,33 @@
                         "description": "HTML content",
                         "schema": {
                             "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/readyz": {
+            "get": {
+                "produces": [
+                    "text/plain"
+                ],
+                "tags": [
+                    "Health"
+                ],
+                "summary": "Readiness probe",
+                "responses": {
+                    "200": {
+                        "description": "Database connection is ready",
+                        "schema": {
+                            "type": "string",
+                            "example": "ready"
+                        }
+                    },
+                    "503": {
+                        "description": "Database not configured or not reachable",
+                        "schema": {
+                            "type": "string",
+                            "example": "database not ready"
                         }
                     }
                 }
@@ -228,6 +305,96 @@
         }
     },
     "definitions": {
+        "handlers.APIErrorResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string",
+                    "example": "weather service unavailable"
+                }
+            }
+        },
+        "handlers.SearchResponse": {
+            "type": "object",
+            "properties": {
+                "search_results": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handlers.SearchResult"
+                    }
+                }
+            }
+        },
+        "handlers.SearchResult": {
+            "type": "object",
+            "properties": {
+                "Description": {
+                    "type": "string",
+                    "example": "Short description"
+                },
+                "ID": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "Language": {
+                    "type": "string",
+                    "example": "en"
+                },
+                "Title": {
+                    "type": "string",
+                    "example": "Example page title"
+                },
+                "URL": {
+                    "type": "string",
+                    "example": "https://example.com"
+                }
+            }
+        },
+        "handlers.WeatherAPIResponse": {
+            "type": "object",
+            "properties": {
+                "forecast": {
+                    "$ref": "#/definitions/handlers.WeatherForecast"
+                },
+                "location": {
+                    "$ref": "#/definitions/handlers.WeatherLocation"
+                }
+            }
+        },
+        "handlers.WeatherForecast": {
+            "type": "object",
+            "properties": {
+                "step": {
+                    "type": "string",
+                    "example": "PT1H"
+                },
+                "temperature": {
+                    "type": "number",
+                    "example": 12.3
+                },
+                "wind_direction": {
+                    "type": "number",
+                    "example": 225
+                },
+                "wind_speed": {
+                    "type": "number",
+                    "example": 4.5
+                }
+            }
+        },
+        "handlers.WeatherLocation": {
+            "type": "object",
+            "properties": {
+                "latitude": {
+                    "type": "number",
+                    "example": 55.715
+                },
+                "longitude": {
+                    "type": "number",
+                    "example": 12.561
+                }
+            }
+        },
         "main.AuthResponse": {
             "type": "object",
             "properties": {
@@ -238,34 +405,6 @@
                 "statusCode": {
                     "type": "integer",
                     "example": 200
-                }
-            }
-        },
-        "main.SearchResponse": {
-            "type": "object",
-            "properties": {
-                "search_results": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/main.SearchResult"
-                    }
-                }
-            }
-        },
-        "main.SearchResult": {
-            "type": "object",
-            "properties": {
-                "content": {
-                    "type": "string",
-                    "example": "Sample content"
-                },
-                "id": {
-                    "type": "integer",
-                    "example": 1
-                },
-                "language": {
-                    "type": "string",
-                    "example": "en"
                 }
             }
         }

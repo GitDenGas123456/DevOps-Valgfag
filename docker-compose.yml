@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   whoknows-app:
     build:
@@ -7,20 +5,17 @@ services:
       dockerfile: Dockerfile
     image: devops-valgfag-app
     container_name: whoknows-app
-    env_file:
-      - .env
     ports:
       - "8080:8080"
+    env_file:
+      - .env
     environment:
+      # vi lader .env styre resten (SESSION_KEY, DMI_API_KEY osv),
+      # men DATABASE_URL sætter vi hårdt her til den rigtige host
       PORT: 8080
       APP_ENV: prod
-      # Set to 0 until Postgres FTS is implemented; set to 1 when tsvector-search is ready
       SEARCH_FTS: 0
-      DB_HOST: postgres_db
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
-      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres_db:5432/${POSTGRES_DB}?sslmode=disable
+      DATABASE_URL: postgres://devops:devops@postgres_db:5432/whoknows?sslmode=disable
       SESSION_KEY: ${SESSION_KEY}
       DMI_API_KEY: ${DMI_API_KEY}
     depends_on:
@@ -44,7 +39,7 @@ services:
       timeout: 5s
       retries: 5
     ports:
-      - "5432:5432"   # kan fjernes i prod hvis du ikke vil eksponere DB
+      - "5432:5432"   # kan fjernes i "rigtig" prod, men er nice til udvikling
     volumes:
       - postgres-data:/var/lib/postgresql/data
 
@@ -83,6 +78,8 @@ services:
     container_name: grafana
     ports:
       - "3000:3000"
+    env_file:
+      - .env
     environment:
       GF_SECURITY_ADMIN_USER: ${GF_SECURITY_ADMIN_USER}
       GF_SECURITY_ADMIN_PASSWORD: ${GF_SECURITY_ADMIN_PASSWORD}
