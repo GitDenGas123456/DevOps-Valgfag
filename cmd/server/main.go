@@ -80,14 +80,15 @@ func main() {
 	}
 
 	appEnv := getenv("APP_ENV", "dev")
+	// Note: len(sessionKey) counts bytes, not characters.
 	if appEnv == "prod" && len(sessionKey) < 32 {
-		log.Fatal("SESSION_KEY must be at least 32 bytes in prod")
+		log.Fatal("SESSION_KEY must be at least 32 bytes (not characters) in prod")
 	}
 
 	useFTS := getenv("SEARCH_FTS", "0") == "1"
 	externalSearchEnabled := getenv("EXTERNAL_SEARCH", "1") == "1"
 
-	// Åbn PostgreSQL via pgx-driveren
+	// Open PostgreSQL using the pgx driver
 	db, err := sql.Open("pgx", dsn)
 	if err != nil {
 		log.Fatal(err)
@@ -103,7 +104,7 @@ func main() {
 		log.Fatal("Failed to connect to PostgreSQL:", err)
 	}
 
-	// Kør migrations
+	// Run database migrations
 	log.Println("Running database migrations...")
 	if err := migrate.RunMigrations(db); err != nil {
 		log.Fatalf("migration error: %v", err)
