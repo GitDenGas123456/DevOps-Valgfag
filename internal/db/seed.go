@@ -1,3 +1,7 @@
+// NOTE:
+// This seeding helper is **SQLite-only** and intended for local demos/tests.
+// It uses SQLite-specific syntax (e.g. INSERT OR IGNORE) and is **not**
+// called from the PostgreSQL runtime code path.
 package db
 
 // Imports
@@ -15,6 +19,12 @@ func Seed(database *sql.DB) error {
 	raw, err := os.ReadFile("internal/db/schema.sql")
 	if err != nil {
 		// If schema is missing, do nothing.
+		return nil
+	}
+
+	appEnv := strings.ToLower(strings.TrimSpace(os.Getenv("APP_ENV")))
+	if appEnv == "prod" || appEnv == "production" {
+		// Skip seeding in production / Postgres runtime
 		return nil
 	}
 
@@ -44,7 +54,6 @@ func Seed(database *sql.DB) error {
 		}
 	}
 
-	appEnv := strings.ToLower(strings.TrimSpace(os.Getenv("APP_ENV")))
 	if appEnv != "prod" && appEnv != "production" {
 		if _, err := database.Exec(`
 INSERT OR IGNORE INTO users (username, email, password)

@@ -1,9 +1,8 @@
 // @title WhoKnows API
 // @version 0.1.0
-// @description API specification for the WhoKnows web application
+// @description API for the WhoKnows web app: session auth, search content, weather forecast, and health/readiness probes.
 // @BasePath /
 package main
-
 
 import (
 	"database/sql"
@@ -11,8 +10,9 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
-	"path/filepath"
+	"strings"
 	"time"
 
 	_ "devops-valgfag/docs"
@@ -55,27 +55,37 @@ type AuthResponse struct {
 	Message    string `json:"message" example:"Login successful"`
 }
 
+type dsnMeta struct {
+	Source string
+	Host   string
+	DB     string
+	User   string
+}
+
 func main() {
 	// Set port
 	port := getenv("PORT", "8080")
 
-	// Required PostgreSQL DSN
-	dsn := os.Getenv("DATABASE_URL")
-	if dsn == "" {
-		log.Fatal("DATABASE_URL environment variable is required when using PostgreSQL")
-	}
+	// Resolve the database DSN (preferring Docker Compose settings)
+	dsn, meta := resolvePostgresDSN()
 
-	// This keeps your original directory creation logic (harmless, still needed for templates)
-	dbPath := getenv("DATABASE_PATH", "data/seed/whoknows.db")
-	if err := os.MkdirAll(filepath.Dir(dbPath), 0o755); err != nil {
-		log.Fatal(err)
-	}
+	log.Printf("Using PostgreSQL DSN (source=%s host=%s db=%s user=%s)", meta.Source, meta.Host, meta.DB, meta.User)
 
 	// Session key + FTS flag
-	sessionKey := getenv("SESSION_KEY", "development key")
-	useFTS := getenv("SEARCH_FTS", "0")
+	sessionKey := getenv("SESSION_KEY", "")
+	if sessionKey == "" {
+		log.Fatal("SESSION_KEY is required")
+	}
 
-	// Open PostgreSQL instead of SQLite
+	appEnv := getenv("APP_ENV", "dev")
+	if appEnv == "prod" && len(sessionKey) < 32 {
+		log.Fatal("SESSION_KEY must be at least 32 bytes in prod")
+	}
+
+	useFTS := getenv("SEARCH_FTS", "0")
+	externalSearchEnabled := getenv("EXTERNAL_SEARCH", "1") == "1"
+
+	// Open PostgreSQL
 	db, err := sql.Open("pgx", dsn)
 	if err != nil {
 		log.Fatal(err)
@@ -87,13 +97,14 @@ func main() {
 		log.Fatal("Failed to connect to PostgreSQL:", err)
 	}
 
-
 	// Run PostgreSQL migrations here
+	log.Println("Running database migrations...")
 	if err := migrate.RunMigrations(db); err != nil {
-		log.Fatal("Migration error:", err)
+		log.Fatalf("migration error: %v", err)
 	}
 
-	fmt.Println("Connected to PostgreSQL successfully!")
+	log.Println("Connected to PostgreSQL and migrations applied successfully!")
+
 	// Templates
 	funcs := template.FuncMap{
 		"now":  time.Now,
@@ -113,6 +124,7 @@ func main() {
 	} else {
 		h.EnableFTSSearch(false)
 	}
+	h.EnableExternalSearch(externalSearchEnabled)
 
 	// Router
 	r := mux.NewRouter()
@@ -134,10 +146,14 @@ func main() {
 	r.HandleFunc("/api/login", h.APILoginHandler).Methods("POST")
 	r.HandleFunc("/api/register", h.APIRegisterHandler).Methods("POST")
 	r.HandleFunc("/api/logout", h.APILogoutHandler).Methods("POST", "GET")
-	r.HandleFunc("/api/search", h.APISearchHandler).Methods("POST")
+	r.HandleFunc("/api/search", h.APISearchHandler).Methods("GET", "POST")
+	r.HandleFunc("/api/weather", h.APIWeatherHandler).Methods("GET")
 
 	// Health check
 	r.HandleFunc("/healthz", h.Healthz).Methods(http.MethodGet)
+
+	// Readiness check
+	r.HandleFunc("/readyz", h.Readyz).Methods(http.MethodGet)
 
 	// Metrics endpoint
 	r.Handle("/metrics", promhttp.Handler())
@@ -148,6 +164,61 @@ func main() {
 	// Start server
 	fmt.Printf("Server running on :%s\n", port)
 	log.Fatal(http.ListenAndServe(":"+port, r))
+}
+
+// resolvePostgresDSN builds the connection string with sensible defaults.
+// If DB_HOST is set (e.g., in Docker Compose), it takes precedence and we assemble
+// the DSN from individual PostgreSQL env vars. Otherwise we honor DATABASE_URL,
+// and finally fall back to a docker-friendly default host.
+func resolvePostgresDSN() (string, dsnMeta) {
+	if host := os.Getenv("DB_HOST"); host != "" {
+		return buildPostgresDSN(host, "DB_HOST")
+	}
+
+	if dsn := os.Getenv("DATABASE_URL"); dsn != "" {
+		meta, err := extractDSNMeta(dsn)
+		if err != nil {
+			log.Fatal("invalid DATABASE_URL")
+		}
+		meta.Source = "DATABASE_URL"
+		return dsn, meta
+	}
+
+	return buildPostgresDSN("postgres_db", "default")
+}
+
+func buildPostgresDSN(host, source string) (string, dsnMeta) {
+	port := getenv("POSTGRES_PORT", "5432")
+	user := getenv("POSTGRES_USER", "devops")
+	pass := getenv("POSTGRES_PASSWORD", "devops")
+	dbName := getenv("POSTGRES_DB", "whoknows")
+
+	dsn := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable", user, pass, host, port, dbName)
+	return dsn, dsnMeta{
+		Source: source,
+		Host:   host,
+		DB:     dbName,
+		User:   user,
+	}
+}
+
+func extractDSNMeta(raw string) (dsnMeta, error) {
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		return dsnMeta{}, err
+	}
+
+	dbName := strings.TrimPrefix(parsed.Path, "/")
+	user := ""
+	if parsed.User != nil {
+		user = parsed.User.Username()
+	}
+
+	return dsnMeta{
+		Host: parsed.Hostname(),
+		DB:   dbName,
+		User: user,
+	}, nil
 }
 
 func getenv(key, fallback string) string {
