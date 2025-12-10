@@ -194,9 +194,9 @@ func buildPostgresDSN(host, source string) (string, dsnMeta) {
 		"postgres://%s:%s@%s:%s/%s?sslmode=disable",
 		url.QueryEscape(user),
 		url.QueryEscape(pass),
-		host,
+		url.QueryEscape(host),
 		port,
-		dbName,
+		url.QueryEscape(dbName),
 	)
 	return dsn, dsnMeta{
 		Source: source,

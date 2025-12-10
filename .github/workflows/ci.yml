@@ -30,7 +30,7 @@ jobs:
         ports:
           - 5432:5432
         options: >-
-          --health-cmd="pg_isready -U ${{ env.POSTGRES_USER }} -d ${{ env.POSTGRES_DB }}"
+          --health-cmd="pg_isready -U ${{ vars.CI_POSTGRES_USER || 'devops' }} -d ${{ vars.CI_POSTGRES_DB || 'whoknows' }}"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
@@ -119,7 +119,7 @@ jobs:
         ports:
           - 5432:5432
         options: >-
-          --health-cmd="pg_isready -U ${{ env.POSTGRES_USER }} -d ${{ env.POSTGRES_DB }}"
+          --health-cmd="pg_isready -U ${{ vars.CI_POSTGRES_USER || 'devops' }} -d ${{ vars.CI_POSTGRES_DB || 'whoknows' }}"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5

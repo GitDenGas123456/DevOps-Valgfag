@@ -118,7 +118,7 @@ paths:
           in: query
           required: false
         - type: string
-          description: Language code (default: en)
+          description: "Language code (default: en)"
           name: language
           in: query
           required: false
