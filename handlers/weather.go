@@ -125,11 +125,21 @@ func WeatherPageHandler(w http.ResponseWriter, r *http.Request) {
 
 	var forecast *EDRFeature
 	errorMessage := ""
+
 	if err != nil {
 		log.Println("Forecast fetch error:", err)
 		errorMessage = err.Error()
 		w.WriteHeader(http.StatusServiceUnavailable)
-	} else if len(data.Features) > 0 {
+		// Render error-side og returnér, så vi ikke falder videre ned i happy-path
+		renderTemplate(w, r, "weather", map[string]any{
+			"Title":    "Copenhagen Forecast",
+			"Forecast": nil,
+			"Error":    errorMessage,
+		})
+		return
+	}
+
+	if len(data.Features) > 0 {
 		forecast = &data.Features[0]
 	}
 
