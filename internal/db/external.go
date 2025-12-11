@@ -15,7 +15,7 @@ type ExternalResult struct {
 func ExternalExists(database *sql.DB, query, language string) bool {
 	var count int
 	err := database.QueryRow(
-		`SELECT COUNT(*) FROM external_results WHERE query = ? AND language = ?`,
+		`SELECT COUNT(*) FROM external_results WHERE query = $1 AND language = $2`,
 		query, language,
 	).Scan(&count)
 	if err != nil {
@@ -36,14 +36,10 @@ func InsertExternal(database *sql.DB, query, lang string, items []ExternalResult
 		return err
 	}
 
-
-
-
-
-	
 	stmt, err := tx.Prepare(`
-INSERT OR IGNORE INTO external_results (query, language, title, url, snippet)
-VALUES (?, ?, ?, ?, ?)`)
+INSERT INTO external_results (query, language, title, url, snippet)
+VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (query, language, url) DO NOTHING`)
 	if err != nil {
 		_ = tx.Rollback()
 		return err
@@ -71,7 +67,7 @@ func GetExternal(database *sql.DB, query, lang string) ([]ExternalResult, error)
 	rows, err := database.Query(
 		`SELECT title, url, snippet
          FROM external_results
-         WHERE query = ? AND language = ?`,
+         WHERE query = $1 AND language = $2`,
 		query, lang,
 	)
 	if err != nil {

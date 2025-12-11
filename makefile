@@ -16,6 +16,7 @@ lint:
 	else \
 	  echo "golangci-lint not found - skipping (install: https://golangci-lint.run/)"; \
 	fi
+
 test:
 	go test -race -cover ./...
 
@@ -30,11 +31,11 @@ smoke:
 
 docker:
 	@if [ -f Dockerfile ]; then \
-	  if command -v hadolint >/dev/null 2>&1; then hadolint Dockerfile; else echo "hadolint missing — skipping"; fi; \
+	  if command -v hadolint >/dev/null 2>&1; then hadolint Dockerfile; else echo "hadolint missing - skipping"; fi; \
 	  docker build -t whoknows-app:local . ; \
 	fi
 
-
+# Legacy SQLite migration helpers (runtime now uses PostgreSQL)
 DB ?= $(DATABASE_PATH)
 DB := $(if $(DB),$(DB),data/seed/whoknows.db)
 
@@ -42,25 +43,25 @@ DB := $(if $(DB),$(DB),data/seed/whoknows.db)
 
 migrate.init:
 	@mkdir -p migrations
-	@command -v sqlite3 >/dev/null 2>&1 || { echo "sqlite3 not installed – skipping"; exit 0; }
+	@command -v sqlite3 >/dev/null 2>&1 || { echo "sqlite3 not installed - skipping"; exit 0; }
 	@sqlite3 "$(DB)" "CREATE TABLE IF NOT EXISTS schema_migrations (version TEXT PRIMARY KEY);"
-	@echo "Init done → $(DB)"
+	@echo "Init done -> $(DB)"
 
 migrate: migrate.init
-	@command -v sqlite3 >/dev/null 2>&1 || { echo "sqlite3 not installed – skipping"; exit 0; }
+	@command -v sqlite3 >/dev/null 2>&1 || { echo "sqlite3 not installed - skipping"; exit 0; }
 	@for f in $$(ls -1 migrations/*.sql 2>/dev/null | sort); do \
 	  ver=$$(basename $$f .sql); \
 	  applied=$$(sqlite3 "$(DB)" "SELECT 1 FROM schema_migrations WHERE version='$$ver' LIMIT 1;"); \
 	  if [ "$$applied" != "1" ]; then \
 	    echo "Applying $$ver ..."; \
-	    sqlite3 "$(DB)" < "$$f" && sqlite3 "$(DB)" "INSERT INTO schema_migrations(version) VALUES('$$ver');" || { echo "❌ $$ver failed"; exit 1; }; \
+	    sqlite3 "$(DB)" < "$$f" && sqlite3 "$(DB)" "INSERT INTO schema_migrations(version) VALUES('$$ver');" || { echo "FAIL $$ver failed"; exit 1; }; \
 	  fi; \
-	done; echo "✅ All migrations applied"
+	done; echo "OK. All migrations applied"
 
 migrate.check: migrate.init
-	@command -v sqlite3 >/dev/null 2>&1 || { echo "sqlite3 not installed – can't verify"; exit 0; }
+	@command -v sqlite3 >/dev/null 2>&1 || { echo "sqlite3 not installed - can't verify"; exit 0; }
 	@pending=0; for f in $$(ls -1 migrations/*.sql 2>/dev/null | sort); do \
 	  ver=$$(basename $$f .sql); \
 	  applied=$$(sqlite3 "$(DB)" "SELECT 1 FROM schema_migrations WHERE version='$$ver' LIMIT 1;"); \
 	  if [ "$$applied" != "1" ]; then echo "Pending: $$ver"; pending=1; fi; \
-	done; test $$pending -eq 0 && echo "✅ No pending migrations" || (echo "❌ Pending migrations"; exit 1)
+	done; test $$pending -eq 0 && echo "OK. No pending migrations" || (echo "FAIL Pending migrations"; exit 1)

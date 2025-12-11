@@ -9,12 +9,17 @@ services:
     container_name: whoknows-app
     ports:
       - "8080:8080"
+    env_file:
+      - .env
     environment:
+      # We let .env control most settings (SESSION_KEY, DMI_API_KEY, etc.)
+      # The app constructs its own PostgreSQL DSN from POSTGRES_* (and DB_HOST) via resolvePostgresDSN.
       PORT: 8080
       APP_ENV: prod
-      # Set to 0 until Postgres FTS is implemented; set to 1 when tsvector-search is ready
+      # Set to 0 until Postgres FTS is implemented; set to 1 when tsvector search is ready
       SEARCH_FTS: 0
-      DATABASE_URL: ${DATABASE_URL}
+      # Explicitly tell the app which host to use for Postgres (matches the service name below)
+      DB_HOST: postgres_db
       SESSION_KEY: ${SESSION_KEY}
       DMI_API_KEY: ${DMI_API_KEY}
     depends_on:
@@ -26,6 +31,8 @@ services:
     image: postgres:16
     container_name: postgres_db
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -36,7 +43,7 @@ services:
       timeout: 5s
       retries: 5
     ports:
-      - "5432:5432"   # kan fjernes i prod hvis du ikke vil eksponere DB
+      - "5432:5432"   # Can be removed in production, but useful for development
     volumes:
       - postgres-data:/var/lib/postgresql/data
 
@@ -75,6 +82,8 @@ services:
     container_name: grafana
     ports:
       - "3000:3000"
+    env_file:
+      - .env
     environment:
       GF_SECURITY_ADMIN_USER: ${GF_SECURITY_ADMIN_USER}
       GF_SECURITY_ADMIN_PASSWORD: ${GF_SECURITY_ADMIN_PASSWORD}

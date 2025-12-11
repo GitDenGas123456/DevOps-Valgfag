@@ -20,3 +20,4 @@ legacy
 /data/seed/*.db
 
 
+.env
