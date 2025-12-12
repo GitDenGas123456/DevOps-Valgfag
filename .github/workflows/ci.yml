@@ -143,6 +143,7 @@ jobs:
       - name: Start server
         env:
           DATABASE_URL: postgres://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@localhost:5432/${{ env.POSTGRES_DB }}?sslmode=disable
+          SESSION_KEY: "ci-test-session-key"
         run: |
           nohup ./server > app.log 2>&1 &
           echo $! > app.pid
