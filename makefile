@@ -1,4 +1,4 @@
-PHONY: check fmt vet lint test build smoke docker
+PHONY: check fmt vet lint test build smoke docker verify-metrics
 PORT ?= 8080
 LOG   ?= /tmp/whoknows.log
 
@@ -28,6 +28,13 @@ smoke:
 	sleep 1; \
 	URL="http://127.0.0.1:$(PORT)/healthz" scripts/smoke.sh; \
 	kill `cat .app.pid` >/dev/null 2>&1 || true; rm -f .app.pid
+
+verify-metrics:
+	@echo "Curl /search and / to populate metrics (PORT=$(PORT))"
+	@curl -s "http://127.0.0.1:$(PORT)/search?q=abc" >/dev/null
+	@curl -s "http://127.0.0.1:$(PORT)/?q=abc" >/dev/null
+	@echo "Expect both path=\"/search\" and path=\"/\" in app_http_requests_total:"
+	@curl -s "http://127.0.0.1:$(PORT)/metrics" | grep 'app_http_requests_total' | grep -E 'path=\"/search\"|path=\"/\"'
 
 docker:
 	@if [ -f Dockerfile ]; then \

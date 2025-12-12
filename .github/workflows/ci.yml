@@ -1,14 +1,17 @@
 name: CI
 
+
 on:
   push:
     branches: [ main, develop ]
   pull_request:
     branches: [ main, develop ]
 
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
+
 
 jobs:
   # -------------------------
@@ -17,16 +20,16 @@ jobs:
   build:
     env:
       POSTGRES_USER: ${{ vars.CI_POSTGRES_USER || 'devops' }}
-      POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD }}
+      POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD || 'devops' }}
       POSTGRES_DB: ${{ vars.CI_POSTGRES_DB || 'whoknows' }}
     runs-on: ubuntu-latest
     services:
       postgres:
         image: postgres:16
         env:
-          # vigtige: env.* virker IKKE her, så vi gentager expressions
+          # Important: env.* does NOT work here, so we repeat the expressions
           POSTGRES_USER: ${{ vars.CI_POSTGRES_USER || 'devops' }}
-          POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD }}
+          POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD || 'devops' }}
           POSTGRES_DB: ${{ vars.CI_POSTGRES_DB || 'whoknows' }}
         ports:
           - 5432:5432
@@ -36,13 +39,16 @@ jobs:
           --health-timeout=5s
           --health-retries=5
 
+
     strategy:
       matrix:
         go-version: [ "1.25.x" ]
 
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -51,14 +57,18 @@ jobs:
           check-latest: true
           cache: true
 
+
       - name: Print go version
         run: go version
+
 
       - name: Download dependencies
         run: go mod download
 
+
       - name: Run go vet
         run: go vet ./...
+
 
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v8
@@ -66,18 +76,21 @@ jobs:
           version: latest
           args: ./...
 
+
       - name: Run tests (race + coverage)
         env:
-          # her må vi godt bruge env.*, de kommer fra job-level env
+          # Here we can use env.*, as they come from the job-level env
           DATABASE_URL: postgres://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@localhost:5432/${{ env.POSTGRES_DB }}?sslmode=disable
         run: |
           go test -v -race ./... \
             -coverpkg=./cmd/server,./handlers,./internal/db \
             -coverprofile=coverage.out
 
+
       - name: Show coverage summary
         if: ${{ always() && hashFiles('coverage.out') != '' }}
         run: go tool cover -func=coverage.out | sed -n '1,200p'
+
 
       - name: Upload coverage (artifact)
         if: ${{ hashFiles('coverage.out') != '' }}
@@ -85,6 +98,7 @@ jobs:
         with:
           name: coverage-${{ matrix.go-version }}
           path: coverage.out
+
 
   # -------------------------
   # Dockerfile lint
@@ -96,10 +110,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+
       - name: Lint Dockerfile
         uses: hadolint/hadolint-action@v3.1.0
         with:
           dockerfile: Dockerfile
+
 
   # -------------------------
   # Health / smoke test
@@ -109,14 +125,14 @@ jobs:
     needs: build
     env:
       POSTGRES_USER: ${{ vars.CI_POSTGRES_USER || 'devops' }}
-      POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD }}
+      POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD || 'devops' }}
       POSTGRES_DB: ${{ vars.CI_POSTGRES_DB || 'whoknows' }}
     services:
       postgres:
         image: postgres:16
         env:
           POSTGRES_USER: ${{ vars.CI_POSTGRES_USER || 'devops' }}
-          POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD }}
+          POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD || 'devops' }}
           POSTGRES_DB: ${{ vars.CI_POSTGRES_DB || 'whoknows' }}
         ports:
           - 5432:5432
@@ -126,9 +142,11 @@ jobs:
           --health-timeout=5s
           --health-retries=5
 
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -137,19 +155,25 @@ jobs:
           check-latest: true
           cache: true
 
+
       - name: Build server
         run: go build -o server ./cmd/server
+
 
       - name: Start server
         env:
           DATABASE_URL: postgres://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@localhost:5432/${{ env.POSTGRES_DB }}?sslmode=disable
+          SESSION_KEY: ci-session-key-0123456789-abcdefghijklmnopqrstuvwxyz
+          APP_ENV: prod
         run: |
           nohup ./server > app.log 2>&1 &
           echo $! > app.pid
           sleep 2
 
+
       - name: Smoke test /healthz
         run: scripts/smoke.sh
+
 
       - name: Stop server & upload logs
         if: always()
@@ -157,12 +181,14 @@ jobs:
           if [ -f app.pid ]; then kill "$(cat app.pid)" || true; fi
           sleep 1
 
+
       - name: Upload app.log
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: app-log
           path: app.log
+
 
   # -------------------------
   # Build & push Docker image (only on push to main)
@@ -175,9 +201,11 @@ jobs:
       contents: read
       packages: write
 
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -185,6 +213,7 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
@@ -194,8 +223,9 @@ jobs:
           tags: |
             ghcr.io/gitdengas123456/devops-valgfag:latest
 
+
   # -------------------------
-  # Deploy to VM via SSH (compose + migrate)
+  # Deploy to VM via SSH (compose + .env)
   # -------------------------
   deploy:
     needs: docker-build
@@ -203,9 +233,11 @@ jobs:
     environment: produktion
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
+
     steps:
       - name: Checkout code (for reference)
         uses: actions/checkout@v4
+
 
       - name: Deploy to VM via SSH
         uses: appleboy/ssh-action@v1.1.0
@@ -217,20 +249,52 @@ jobs:
           script: |
             set -e
 
-            echo "==> Går til app-mappe på VM..."
+
+            echo "==> Going to app folder on VM..."
             cd ${{ vars.DEPLOY_PATH }}
+
 
             echo "==> Sync repo to origin/main..."
             git fetch origin main
             git reset --hard origin/main
 
-            echo "==> Puller seneste image fra GHCR..."
+
+            echo "==> Writing .env from GitHub secrets/vars..."
+            umask 077
+            cat > .env <<'EOF'
+            APP_ENV=prod
+            PORT=8080
+
+
+            POSTGRES_USER=${{ vars.POSTGRES_USER }}
+            POSTGRES_PASSWORD=${{ vars.POSTGRES_PASSWORD }}
+            POSTGRES_DB=${{ vars.POSTGRES_DB }}
+
+
+            SESSION_KEY=${{ secrets.SESSION_KEY }}
+            DMI_API_KEY=${{ secrets.DMI_API_KEY }}
+
+
+            GF_SECURITY_ADMIN_USER=${{ secrets.GF_SECURITY_ADMIN_USER }}
+            GF_SECURITY_ADMIN_PASSWORD=${{ secrets.GRAFANA_ADMIN_PASSWORD }}
+            EOF
+            chmod 600 .env
+
+
+            echo "==> Pulling latest image from GHCR..."
             docker compose pull
 
-            echo "==> Starter/retstarter compose stack..."
+
+            echo "==> Starting/restarting compose stack..."
             docker compose up -d --remove-orphans
 
-            echo "==> Rydder gamle images..."
+
+            echo "==> Cleaning up old images..."
             docker image prune -f
 
+
             echo "Deployment finished."
+
+
+
+

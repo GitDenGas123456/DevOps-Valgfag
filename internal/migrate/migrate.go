@@ -102,9 +102,12 @@ func applyMigrationFile(db *sql.DB, version, file string) error {
 		return fmt.Errorf("failed to begin transaction for migration %s: %w", version, err)
 	}
 
-	if _, err := tx.Exec(string(content)); err != nil {
-		_ = tx.Rollback()
-		return fmt.Errorf("migration %s failed: %w", version, err)
+	statements := splitSQLStatements(string(content))
+	for _, stmt := range statements {
+		if _, err := tx.Exec(stmt); err != nil {
+			_ = tx.Rollback()
+			return fmt.Errorf("migration %s failed: %w", version, err)
+		}
 	}
 
 	if _, err := tx.Exec(
@@ -120,4 +123,84 @@ func applyMigrationFile(db *sql.DB, version, file string) error {
 	}
 
 	return nil
+}
+
+// splitSQLStatements breaks a migration file into individual statements.
+// It keeps semicolons inside single quotes and dollar-quoted blocks intact.
+func splitSQLStatements(content string) []string {
+	var (
+		statements []string
+		buf        strings.Builder
+		inSingle   bool
+		inDollar   bool
+		dollarTag  string
+	)
+
+	for i := 0; i < len(content); i++ {
+		ch := content[i]
+
+		// Handle dollar-quoted strings: $$...$$ or $tag$...$tag$
+		if !inSingle && ch == '$' {
+			tagEnd := i + 1
+			for tagEnd < len(content) && isDollarTagChar(content[tagEnd]) {
+				tagEnd++
+			}
+			if tagEnd < len(content) && content[tagEnd] == '$' {
+				tag := content[i+1 : tagEnd]
+				if inDollar && tag == dollarTag {
+					inDollar = false
+					dollarTag = ""
+				} else if !inDollar {
+					inDollar = true
+					dollarTag = tag
+				}
+				for j := i; j <= tagEnd; j++ {
+					buf.WriteByte(content[j])
+				}
+				i = tagEnd
+				continue
+			}
+		}
+
+		// Handle single-quoted strings, respecting escaped quotes.
+		if !inDollar && ch == '\'' {
+			buf.WriteByte(ch)
+			if inSingle {
+				if i+1 < len(content) && content[i+1] == '\'' {
+					buf.WriteByte(content[i+1])
+					i++
+					continue
+				}
+				inSingle = false
+			} else {
+				inSingle = true
+			}
+			continue
+		}
+
+		// Statement boundary: semicolon outside strings/blocks.
+		if ch == ';' && !inSingle && !inDollar {
+			stmt := strings.TrimSpace(buf.String())
+			if stmt != "" {
+				statements = append(statements, stmt)
+			}
+			buf.Reset()
+			continue
+		}
+
+		buf.WriteByte(ch)
+	}
+
+	if tail := strings.TrimSpace(buf.String()); tail != "" {
+		statements = append(statements, tail)
+	}
+
+	return statements
+}
+
+func isDollarTagChar(b byte) bool {
+	return b == '_' ||
+		(b >= 'a' && b <= 'z') ||
+		(b >= 'A' && b <= 'Z') ||
+		(b >= '0' && b <= '9')
 }

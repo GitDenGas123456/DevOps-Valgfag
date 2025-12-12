@@ -12,10 +12,9 @@ import (
 )
 
 // ==========
-// Models
+// Models (DMI EDR GeoJSON subset)
 // ==========
 
-// Weather response structures
 type EDRFeatureCollection struct {
 	Type     string       `json:"type"`
 	Features []EDRFeature `json:"features"`
@@ -29,7 +28,7 @@ type EDRFeature struct {
 
 type EDRGeometry struct {
 	Type        string    `json:"type"`
-	Coordinates []float64 `json:"coordinates"`
+	Coordinates []float64 `json:"coordinates"` // [lon, lat]
 }
 
 type EDRProperties struct {
@@ -39,19 +38,17 @@ type EDRProperties struct {
 	Step        string  `json:"step"`
 }
 
-// WeatherAPIResponse is a reduced payload used by /api/weather.
+// API response structures
 type WeatherAPIResponse struct {
 	Location WeatherLocation `json:"location"`
 	Forecast WeatherForecast `json:"forecast"`
 }
 
-// WeatherLocation holds the forecast point coordinates.
 type WeatherLocation struct {
 	Latitude  float64 `json:"latitude"`
 	Longitude float64 `json:"longitude"`
 }
 
-// WeatherForecast holds the primary readings returned to the client.
 type WeatherForecast struct {
 	Temperature   float64 `json:"temperature"`
 	WindSpeed     float64 `json:"wind_speed"`
@@ -59,17 +56,14 @@ type WeatherForecast struct {
 	Step          string  `json:"step"`
 }
 
-// APIErrorResponse matches the JSON error envelope used by API handlers.
 type APIErrorResponse struct {
 	Error string `json:"error"`
 }
 
-var weatherClient = &http.Client{
-	Timeout: 5 * time.Second,
-}
+var weatherClient = &http.Client{Timeout: 5 * time.Second}
 
 // ==========
-// Weather API
+// Weather fetcher
 // ==========
 
 func GetCopenhagenForecast(ctx context.Context) (*EDRFeatureCollection, error) {
@@ -87,7 +81,10 @@ func GetCopenhagenForecast(ctx context.Context) (*EDRFeatureCollection, error) {
 		"%s/v1/forecastedr/collections/harmonie_dini_sf/position"+
 			"?coords=POINT(12.561%%2055.715)&crs=crs84"+
 			"&parameter-name=temperature-2m,wind-speed-10m,wind-dir-10m"+
-			"&f=GeoJSON&api-key=%s", baseURL, apiKey)
+			"&f=GeoJSON&api-key=%s",
+		baseURL,
+		apiKey,
+	)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -99,8 +96,8 @@ func GetCopenhagenForecast(ctx context.Context) (*EDRFeatureCollection, error) {
 		return nil, fmt.Errorf("HTTP request failed: %w", err)
 	}
 	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			log.Printf("failed to close weather response body: %v", err)
+		if cerr := resp.Body.Close(); cerr != nil {
+			log.Printf("failed to close weather response body: %v", cerr)
 		}
 	}()
 
@@ -117,38 +114,38 @@ func GetCopenhagenForecast(ctx context.Context) (*EDRFeatureCollection, error) {
 }
 
 // ==========
-// Page handler
+// Page handler: /weather
 // ==========
 
 func WeatherPageHandler(w http.ResponseWriter, r *http.Request) {
 	data, err := GetCopenhagenForecast(r.Context())
 
-	var forecast *EDRFeature
-	errorMessage := ""
-
 	if err != nil {
 		log.Println("Forecast fetch error:", err)
-		errorMessage = err.Error()
 		w.WriteHeader(http.StatusServiceUnavailable)
-		// Render error-side og returnér, så vi ikke falder videre ned i happy-path
 		renderTemplate(w, r, "weather", map[string]any{
 			"Title":    "Copenhagen Forecast",
 			"Forecast": nil,
-			"Error":    errorMessage,
+			"Error":    err.Error(),
 		})
 		return
 	}
 
-	if len(data.Features) > 0 {
+	var forecast *EDRFeature
+	if data != nil && len(data.Features) > 0 {
 		forecast = &data.Features[0]
 	}
 
 	renderTemplate(w, r, "weather", map[string]any{
 		"Title":    "Copenhagen Forecast",
 		"Forecast": forecast,
-		"Error":    errorMessage,
+		"Error":    "",
 	})
 }
+
+// ==========
+// API handler: /api/weather
+// ==========
 
 // APIWeatherHandler godoc
 // @Summary      Get weather forecast
@@ -160,40 +157,24 @@ func WeatherPageHandler(w http.ResponseWriter, r *http.Request) {
 // @Router       /api/weather [get]
 func APIWeatherHandler(w http.ResponseWriter, r *http.Request) {
 	data, err := GetCopenhagenForecast(r.Context())
-	if err != nil {
-		log.Println("weather API fetch error:", err)
-		writeJSON(w, http.StatusServiceUnavailable, APIErrorResponse{
-			Error: "weather service unavailable",
-		})
-		return
-	}
-
-	if data == nil {
-		log.Println("weather API: empty response body")
-		writeJSON(w, http.StatusServiceUnavailable, APIErrorResponse{
-			Error: "no weather data available",
-		})
-		return
-	}
-
-	if len(data.Features) == 0 {
-		log.Println("weather API: empty feature list")
-		writeJSON(w, http.StatusServiceUnavailable, APIErrorResponse{
-			Error: "no weather data available",
-		})
+	if err != nil || data == nil || len(data.Features) == 0 {
+		if err != nil {
+			log.Println("weather API fetch error:", err)
+		} else {
+			log.Println("weather API: no data available")
+		}
+		writeJSON(w, http.StatusServiceUnavailable, APIErrorResponse{Error: "weather service unavailable"})
 		return
 	}
 
 	first := data.Features[0]
 	if len(first.Geometry.Coordinates) < 2 {
 		log.Println("weather API: missing coordinates in response")
-		writeJSON(w, http.StatusServiceUnavailable, APIErrorResponse{
-			Error: "weather data incomplete",
-		})
+		writeJSON(w, http.StatusServiceUnavailable, APIErrorResponse{Error: "weather data incomplete"})
 		return
 	}
 
-	resp := WeatherAPIResponse{
+	writeJSON(w, http.StatusOK, WeatherAPIResponse{
 		Location: WeatherLocation{
 			Latitude:  first.Geometry.Coordinates[1],
 			Longitude: first.Geometry.Coordinates[0],
@@ -204,7 +185,5 @@ func APIWeatherHandler(w http.ResponseWriter, r *http.Request) {
 			WindDirection: first.Properties.WindDir,
 			Step:          first.Properties.Step,
 		},
-	}
-
-	writeJSON(w, http.StatusOK, resp)
+	})
 }
