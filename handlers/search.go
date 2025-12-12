@@ -168,7 +168,7 @@ func APISearchHandler(w http.ResponseWriter, r *http.Request) {
 		if useFTSSearch {
 			// Use a CTE so plainto_tsquery($2) is parsed only once.
 			ftsQuery := `
-				WITH q AS (SELECT plainto_tsquery($2) AS query)
+				WITH q AS (SELECT plainto_tsquery('simple', $2) AS query)
 				SELECT id, title, url, language, content
 				FROM pages, q
 				WHERE language = $1
