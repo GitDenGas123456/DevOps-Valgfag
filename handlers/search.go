@@ -39,7 +39,7 @@ type SearchResult struct {
 }
 
 // -----------------------------------------------------------------------------
-// WEB PAGE SEARCH HANDLER (PostgreSQL-compatible)
+// WEB PAGE SEARCH HANDLER (PostgreSQL-compatible + SQLite compatible)
 // -----------------------------------------------------------------------------
 func SearchPageHandler(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query().Get("q")
@@ -58,16 +58,16 @@ func SearchPageHandler(w http.ResponseWriter, r *http.Request) {
 
 	var results []SearchResult
 
-	// BASIC SEARCH (ILIKE for PostgreSQL)
+	// BASIC SEARCH (ILIKE replaced with LOWER(...) LIKE LOWER(...) for SQLite compatibility)
 	if q != "" {
-		// ---------------------------
-		// Stage 1 - Local search in pages
-		// ---------------------------
 		rows, err := db.Query(
 			`SELECT id, title, url, language, content
 			 FROM pages
 			 WHERE language = $1 
-			   AND (title ILIKE $2 OR content ILIKE $2)
+			   AND (
+					LOWER(title) LIKE LOWER($2)
+					OR LOWER(content) LIKE LOWER($2)
+				   )
 			 LIMIT $3`,
 			language, "%"+q+"%", pageLimit,
 		)
@@ -87,9 +87,6 @@ func SearchPageHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if externalEnabled {
-			// ---------------------------
-			// Stage 2 - Wikipedia search when NOT cached
-			// ---------------------------
 			if !dbx.ExternalExists(db, q, language) {
 				scraped, err := scraper.WikipediaSearch(q, 10)
 				if err != nil {
@@ -109,9 +106,6 @@ func SearchPageHandler(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 
-			// ---------------------------
-			// Stage 3 - Load cached Wikipedia results
-			// ---------------------------
 			external, err := dbx.GetExternal(db, q, language)
 			if err == nil {
 				for _, e := range external {
@@ -139,7 +133,7 @@ func SearchPageHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // -----------------------------------------------------------------------------
-// API SEARCH HANDLER (PostgreSQL-compatible)
+// API SEARCH HANDLER (PostgreSQL-compatible + SQLite compatible)
 // -----------------------------------------------------------------------------
 func APISearchHandler(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query().Get("q")
@@ -163,10 +157,9 @@ func APISearchHandler(w http.ResponseWriter, r *http.Request) {
 		const offset = 0
 
 		// ---------------------------------------------------------------------
-		// FTS SEARCH (PostgreSQL content_tsv)
+		// FTS SEARCH (unchanged)
 		// ---------------------------------------------------------------------
 		if useFTSSearch {
-			// Use a CTE so plainto_tsquery($2) is parsed only once.
 			ftsQuery := `
 				WITH q AS (SELECT plainto_tsquery($2) AS query)
 				SELECT id, title, url, language, content
@@ -179,13 +172,16 @@ func APISearchHandler(w http.ResponseWriter, r *http.Request) {
 
 			rows, err := db.Query(ftsQuery, language, q, limit, offset)
 			if err != nil {
-				// Fallback to ILIKE if FTS fails (e.g. missing tsvector, bad query)
-				log.Println("FTS search error, falling back to ILIKE:", err)
+				// Fallback: LOWER(...) LIKE LOWER(...)
+				log.Println("FTS search error, falling back to LIKE:", err)
 				rows, err = db.Query(
 					`SELECT id, title, url, language, content
 					 FROM pages
 					 WHERE language = $1
-					   AND (title ILIKE $2 OR content ILIKE $2)
+					   AND (
+							LOWER(title) LIKE LOWER($2)
+							OR LOWER(content) LIKE LOWER($2)
+						   )
 					 LIMIT $3 OFFSET $4`,
 					language, "%"+q+"%", limit, offset,
 				)
@@ -204,20 +200,25 @@ func APISearchHandler(w http.ResponseWriter, r *http.Request) {
 					}
 				}
 			} else {
-				log.Println("FTS and fallback ILIKE search both failed:", err)
+				log.Println("FTS + fallback LIKE search failed:", err)
 			}
+
 		} else {
 			// -----------------------------------------------------------------
-			// BASIC SEARCH (ILIKE)
+			// BASIC SEARCH (ILIKE replaced with LOWER(...) LIKE LOWER(...))
 			// -----------------------------------------------------------------
 			rows, err := db.Query(
 				`SELECT id, title, url, language, content
 				 FROM pages
 				 WHERE language = $1
-				   AND (title ILIKE $2 OR content ILIKE $2)
+				   AND (
+						LOWER(title) LIKE LOWER($2)
+						OR LOWER(content) LIKE LOWER($2)
+					   )
 				 LIMIT $3 OFFSET $4`,
 				language, "%"+q+"%", limit, offset,
 			)
+
 			if err == nil {
 				defer func() {
 					if err := rows.Close(); err != nil {
@@ -231,14 +232,11 @@ func APISearchHandler(w http.ResponseWriter, r *http.Request) {
 					}
 				}
 			} else {
-				log.Println("Basic ILIKE search failed:", err)
+				log.Println("Basic LIKE search failed:", err)
 			}
 		}
 
 		if externalEnabled {
-			// ---------------------------
-			// Stage 2 - Wikipedia search when NOT cached
-			// ---------------------------
 			if !dbx.ExternalExists(db, q, language) {
 				scraped, err := scraper.WikipediaSearch(q, 10)
 				if err != nil {
@@ -258,9 +256,6 @@ func APISearchHandler(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 
-			// ---------------------------
-			// Stage 3 - Load cached Wikipedia results
-			// ---------------------------
 			external, err := dbx.GetExternal(db, q, language)
 			if err != nil {
 				log.Println("GetExternal error:", err)
