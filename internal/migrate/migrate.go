@@ -12,6 +12,11 @@ import (
 // RunMigrations applies all pending .sql migrations found in the migrations/ folder.
 // Each migration is executed in a transaction and recorded in schema_migrations.
 func RunMigrations(db *sql.DB) error {
+
+	// Acquire advisory lock to prevent concurrent migrations
+	_, _ = db.Exec("SELECT pg_advisory_lock(987654321)")
+	defer db.Exec("SELECT pg_advisory_unlock(987654321)") // CHANGE
+
 	if err := ensureSchemaMigrationsTable(db); err != nil {
 		return err
 	}
@@ -102,9 +107,20 @@ func applyMigrationFile(db *sql.DB, version, file string) error {
 		return fmt.Errorf("failed to begin transaction for migration %s: %w", version, err)
 	}
 
-	if _, err := tx.Exec(string(content)); err != nil {
-		_ = tx.Rollback()
-		return fmt.Errorf("migration %s failed: %w", version, err)
+	// Split SQL file into separate statements (pgx cannot run multiple in one Exec)
+	statements := strings.Split(string(content), ";")
+
+	for _, stmt := range statements {
+		stmt = strings.TrimSpace(stmt)
+		if stmt == "" {
+			continue
+		}
+
+		// CHANGE: Execute each statement individually
+		if _, err := tx.Exec(stmt); err != nil {
+			_ = tx.Rollback()
+			return fmt.Errorf("migration %s failed on statement %q: %w", version, stmt, err)
+		}
 	}
 
 	if _, err := tx.Exec(
