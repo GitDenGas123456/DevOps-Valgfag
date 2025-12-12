@@ -19,6 +19,12 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o app ./cmd/server
 FROM alpine:3.20
 WORKDIR /app
 
+# Create non-root user and group for runtime security
+RUN addgroup -S app && adduser -S app -G app
+
+# Use non-root user for the application
+USER app
+
 COPY --from=build /app/app .
 
 COPY --from=build /app/templates ./templates
