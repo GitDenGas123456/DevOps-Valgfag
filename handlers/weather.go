@@ -77,7 +77,7 @@ func GetCopenhagenForecast(ctx context.Context) (*EDRFeatureCollection, error) {
 		baseURL = "https://dmigw.govcloud.dk"
 	}
 
-	url := fmt.Sprintf(
+	u := fmt.Sprintf(
 		"%s/v1/forecastedr/collections/harmonie_dini_sf/position"+
 			"?coords=POINT(12.561%%2055.715)&crs=crs84"+
 			"&parameter-name=temperature-2m,wind-speed-10m,wind-dir-10m"+
@@ -86,7 +86,7 @@ func GetCopenhagenForecast(ctx context.Context) (*EDRFeatureCollection, error) {
 		apiKey,
 	)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -119,7 +119,6 @@ func GetCopenhagenForecast(ctx context.Context) (*EDRFeatureCollection, error) {
 
 func WeatherPageHandler(w http.ResponseWriter, r *http.Request) {
 	data, err := GetCopenhagenForecast(r.Context())
-
 	if err != nil {
 		log.Println("Forecast fetch error:", err)
 		w.WriteHeader(http.StatusServiceUnavailable)
@@ -157,12 +156,14 @@ func WeatherPageHandler(w http.ResponseWriter, r *http.Request) {
 // @Router       /api/weather [get]
 func APIWeatherHandler(w http.ResponseWriter, r *http.Request) {
 	data, err := GetCopenhagenForecast(r.Context())
-	if err != nil || data == nil || len(data.Features) == 0 {
-		if err != nil {
-			log.Println("weather API fetch error:", err)
-		} else {
-			log.Println("weather API: no data available")
-		}
+	if err != nil {
+		log.Println("weather API fetch error:", err)
+		writeJSON(w, http.StatusServiceUnavailable, APIErrorResponse{Error: "weather service unavailable"})
+		return
+	}
+
+	if data == nil || len(data.Features) == 0 {
+		log.Println("weather API: no data/features available")
 		writeJSON(w, http.StatusServiceUnavailable, APIErrorResponse{Error: "weather service unavailable"})
 		return
 	}
