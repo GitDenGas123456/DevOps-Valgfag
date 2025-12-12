@@ -18,7 +18,9 @@
         {{if .LoggedIn}}
           <li>
             <form action="/api/logout" method="POST" style="display:inline;">
-              <button class="nav-link" type="submit" style="border:none;background:none;padding:0;">Logout</button>
+              <button class="nav-link" type="submit" style="border:none;background:none;padding:0;">
+                Logout
+              </button>
             </form>
           </li>
         {{else}}
@@ -28,11 +30,13 @@
       </ul>
     </nav>
   </header>
+
   <main class="container content">
 {{end}}
 
 {{define "footer"}}
   </main>
+
   <footer class="site-footer">
     <div class="container footer-inner">
       <div class="footer-left">
@@ -44,7 +48,9 @@
         {{if .LoggedIn}}
           <li>
             <form action="/api/logout" method="POST" style="display:inline;">
-              <button type="submit" class="nav-link" style="border:none;background:none;padding:0;">Logout</button>
+              <button type="submit" class="nav-link" style="border:none;background:none;padding:0;">
+                Logout
+              </button>
             </form>
           </li>
         {{else}}
@@ -53,26 +59,36 @@
       </ul>
     </div>
   </footer>
+
   <script>
     let searchInput;
+
     document.addEventListener('DOMContentLoaded', () => {
-      searchInput = document.getElementById("search-input");
+      searchInput = document.getElementById('search-input');
       if (searchInput) {
         searchInput.addEventListener('keypress', (e) => {
-          if (e.key === 'Enter') makeSearchRequest();
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            makeSearchRequest();
+          }
         });
       }
     });
+
     function makeSearchRequest() {
       const query = (searchInput && searchInput.value) || '';
       const url = new URL('/search', window.location.origin);
+
       if (query) {
         url.searchParams.set('q', query);
       }
-      const language = new URL(window.location.href).searchParams.get('language');
+
+      const params = new URLSearchParams(window.location.search);
+      const language = params.get('language');
       if (language) {
         url.searchParams.set('language', language);
       }
+
       window.location.href = url.toString();
     }
   </script>
