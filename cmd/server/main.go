@@ -14,6 +14,7 @@ import (
 	"os"
 	"strings"
 	"time"
+	"context"
 
 	_ "devops-valgfag/docs"
 	h "devops-valgfag/handlers"
@@ -99,10 +100,14 @@ func main() {
 		}
 	}()
 
-	// Test DB connection
-	if err := db.Ping(); err != nil {
+
+	// Test DB connection (bounded with timeout)
+	pingCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := db.PingContext(pingCtx); err != nil {
 		log.Fatal("Failed to connect to PostgreSQL:", err)
 	}
+
 
 	// Run database migrations
 	log.Println("Running database migrations...")
@@ -189,7 +194,7 @@ func buildPostgresDSN(host, source string) (string, dsnMeta) {
 	port := getenv("POSTGRES_PORT", "5432")
 	user := getenv("POSTGRES_USER", "devops")
 	pass := getenv("POSTGRES_PASSWORD", "devops")
-	dbName := getenv("POSTGRES_DB", "whoknows")
+	dbName := getenv("POSTGRES_DB", "disable")
 
 	dsn := fmt.Sprintf(
 		"postgres://%s:%s@%s:%s/%s?sslmode=disable",
