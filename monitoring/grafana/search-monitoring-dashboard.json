@@ -1,4 +1,4 @@
-﻿{
+{
   "annotations": {
     "list": [
       {
@@ -1264,11 +1264,7 @@
   "timepicker": {},
   "timezone": "browser",
   "title": "Health",
-  "uid": "adkchb7",
+  "uid": "prometheus",
   "version": 36
 }
-
-
-
-
 

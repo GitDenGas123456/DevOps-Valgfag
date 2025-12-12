@@ -1,6 +1,7 @@
-PHONY: check fmt vet lint test build smoke docker verify-metrics
+.PHONY: check fmt vet lint test build smoke docker verify-metrics grafana-ds-uid
 PORT ?= 8080
 LOG   ?= /tmp/whoknows.log
+GRAFANA_HOST ?= http://localhost:3000
 
 check: fmt vet lint test build smoke docker
 
@@ -41,6 +42,22 @@ docker:
 	  if command -v hadolint >/dev/null 2>&1; then hadolint Dockerfile; else echo "hadolint missing - skipping"; fi; \
 	  docker build -t whoknows-app:local . ; \
 	fi
+
+grafana-ds-uid:
+	@command -v curl >/dev/null 2>&1 || { echo "curl not installed"; exit 1; }
+	@command -v jq >/dev/null 2>&1 || { echo "jq not installed"; exit 1; }
+	@user="$(GF_SECURITY_ADMIN_USER)"; pass="$(GF_SECURITY_ADMIN_PASSWORD)"; \
+	if [ -z "$$user" ] || [ -z "$$pass" ]; then \
+	  if [ -f .env ]; then \
+	    user=$$(grep -E '^GF_SECURITY_ADMIN_USER=' .env | tail -1 | cut -d= -f2- | tr -d '\r'); \
+	    pass=$$(grep -E '^GF_SECURITY_ADMIN_PASSWORD=' .env | tail -1 | cut -d= -f2- | tr -d '\r'); \
+	  fi; \
+	fi; \
+	if [ -z "$$user" ] || [ -z "$$pass" ]; then \
+	  echo "Set GF_SECURITY_ADMIN_USER/GF_SECURITY_ADMIN_PASSWORD (env or .env) before running"; exit 1; \
+	fi; \
+	echo "Grafana API: $(GRAFANA_HOST)/api/datasources"; \
+	curl -s -u "$$user:$$pass" "$(GRAFANA_HOST)/api/datasources" | jq -r '.[].name + " => " + .uid'
 
 # Legacy SQLite migration helpers (runtime now uses PostgreSQL)
 DB ?= $(DATABASE_PATH)

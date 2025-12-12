@@ -18,7 +18,7 @@ services:
       SEARCH_FTS: 0
       # Explicitly tell the app which host to use for Postgres (matches the service name below)
       DB_HOST: postgres_db
-      SESSION_KEY: ${SESSION_KEY:?SESSION_KEY is required (>=32 bytes)}
+      SESSION_KEY: ${SESSION_KEY:?SESSION_KEY is required}
       DMI_API_KEY: ${DMI_API_KEY}
     depends_on:
       postgres_db:
