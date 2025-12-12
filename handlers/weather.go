@@ -129,8 +129,12 @@ func WeatherPageHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Println("Forecast fetch error:", err)
 		errorMessage = err.Error()
+
+		// Ensure headers are set BEFORE WriteHeader
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.WriteHeader(http.StatusServiceUnavailable)
-		// Render error-side og returnér, så vi ikke falder videre ned i happy-path
+
+		// Render error page and return to avoid falling through
 		renderTemplate(w, r, "weather", map[string]any{
 			"Title":    "Copenhagen Forecast",
 			"Forecast": nil,
