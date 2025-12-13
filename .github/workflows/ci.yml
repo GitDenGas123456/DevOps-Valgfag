@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
   pull_request:
-    branches: [ main, develop ]
+    branches: [main, develop]
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -39,7 +39,7 @@ jobs:
 
     strategy:
       matrix:
-        go-version: [ "1.25.x" ]
+        go-version: ["1.25.x"]
 
     steps:
       - name: Checkout repository
@@ -152,7 +152,9 @@ jobs:
           echo $! > app.pid
           sleep 2
 
-      - name: Smoke test /healthz
+      - name: Smoke test /healthz, /readyz, /metrics
+        env:
+          BASE_URL: http://127.0.0.1:8080
         run: scripts/smoke.sh
 
       - name: Stop server & upload logs
