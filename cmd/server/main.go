@@ -142,6 +142,7 @@ func main() {
 	r.HandleFunc("/login", h.LoginPageHandler).Methods(http.MethodGet)
 	r.HandleFunc("/register", h.RegisterPageHandler).Methods(http.MethodGet)
 	r.HandleFunc("/weather", h.WeatherPageHandler).Methods(http.MethodGet)
+	r.HandleFunc("/search", h.SearchPageHandler).Methods(http.MethodGet)
 
 	// API endpoints
 	r.HandleFunc("/api/login", h.APILoginHandler).Methods(http.MethodPost)
