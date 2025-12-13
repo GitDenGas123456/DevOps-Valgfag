@@ -2,7 +2,7 @@ version: "3.9"
 
 services:
   whoknows-app:
-    image: ghcr.io/gitdengas123456/devops-valgfag:${APP_IMAGE_TAG:?set APP_IMAGE_TAG in .env (e.g. v1.2.3 or commit SHA)}
+    image: ghcr.io/gitdengas123456/devops-valgfag:${APP_IMAGE_TAG:?set APP_IMAGE_TAG in .env (e.g. latest, v1.2.3 or commit SHA)}
     container_name: whoknows-app
     ports:
       - "8080:8080"
@@ -44,7 +44,8 @@ services:
       timeout: 5s
       retries: 5
     ports:
-      - "127.0.0.1:5432:5432" # Can be removed in production, but useful for development
+      # Bind only to localhost (good default for a single-VM setup)
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
 
