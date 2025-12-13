@@ -2,7 +2,6 @@
 
 PORT ?= 8080
 LOG  ?= /tmp/whoknows.log
-
 GRAFANA_HOST ?= http://localhost:3000
 
 check: fmt vet lint test build smoke docker
@@ -20,13 +19,14 @@ lint:
 		echo "golangci-lint missing - skipping"; \
 	fi
 
+# Lokal test (CI kører race+coverage selv)
 test:
 	go test ./...
 
 build:
 	go build -o server ./cmd/server
 
-smoke:
+smoke: build
 	@set -e; \
 	./server >"$(LOG)" 2>&1 & echo $$! > .app.pid; \
 	sleep 1; \
@@ -70,7 +70,3 @@ grafana-ds-uid:
 	echo "Grafana API: $(GRAFANA_HOST)/api/datasources"; \
 	curl -fsS --max-time 10 -H "Authorization: Bearer $$token" "$(GRAFANA_HOST)/api/datasources" | \
 		jq -r '.[].name + " => " + .uid'
-
-# Legacy SQLite migration helpers (runtime now uses PostgreSQL)
-DB ?= $(DATABASE_PATH)
-DB := $(if $(DB),$(DB),data/seed/whoknows.db)
