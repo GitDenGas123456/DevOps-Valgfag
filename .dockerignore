@@ -22,7 +22,7 @@ Thumbs.db
 *.swp
 
 # Docker-specific
-Dockerfile
+# Dockerfile
 
 
 # Database (optional — comment this out if you want to copy it into the image)

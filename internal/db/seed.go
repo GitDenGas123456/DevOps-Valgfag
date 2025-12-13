@@ -1,6 +1,9 @@
+// NOTE:
+// This seeding helper is **SQLite-only** and intended for local demos/tests.
+// It uses SQLite-specific syntax (e.g. INSERT OR IGNORE) and is **not**
+// called from the PostgreSQL runtime code path.
 package db
 
-// Imports
 import (
 	"bufio"
 	"bytes"
@@ -18,6 +21,13 @@ func Seed(database *sql.DB) error {
 		return nil
 	}
 
+	appEnv := strings.ToLower(strings.TrimSpace(os.Getenv("APP_ENV")))
+	if appEnv == "prod" || appEnv == "production" {
+		// Skip seeding in production / Postgres runtime
+		return nil
+	}
+
+	// Parse SQL file
 	scanner := bufio.NewScanner(bytes.NewReader(raw))
 	var b strings.Builder
 	for scanner.Scan() {
@@ -33,6 +43,7 @@ func Seed(database *sql.DB) error {
 		return err
 	}
 
+	// Execute schema
 	stmts := strings.Split(b.String(), ";")
 	for _, s := range stmts {
 		s = strings.TrimSpace(s)
@@ -44,15 +55,7 @@ func Seed(database *sql.DB) error {
 		}
 	}
 
-	appEnv := strings.ToLower(strings.TrimSpace(os.Getenv("APP_ENV")))
-	if appEnv != "prod" && appEnv != "production" {
-		if _, err := database.Exec(`
-INSERT OR IGNORE INTO users (username, email, password)
-VALUES ('admin', 'dev@example.com', '$2a$10$wHgFJ4EvAty4/nXZ7LxROulqfEUvvVdHRK3g.B40VgTfZ2.PU6vSm');
-`); err != nil {
-			return err
-		}
-	}
+	// No default admin user seeded anymore – avoids hard-coded bcrypt hash.
 
 	return nil
 }
