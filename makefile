@@ -21,7 +21,7 @@ lint:
 
 # Lokal test (CI kører race+coverage selv)
 test:
-	go test ./...
+	go test -race ./...
 
 build:
 	go build -o server ./cmd/server
