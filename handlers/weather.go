@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -39,6 +40,7 @@ type EDRProperties struct {
 }
 
 // API response structures
+
 type WeatherAPIResponse struct {
 	Location WeatherLocation `json:"location"`
 	Forecast WeatherForecast `json:"forecast"`
@@ -102,7 +104,9 @@ func GetCopenhagenForecast(ctx context.Context) (*EDRFeatureCollection, error) {
 	}()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("weather service unavailable (status %d)", resp.StatusCode)
+		// læs en lille smule af body for bedre fejlsøgning (uden at spamme logs)
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		return nil, fmt.Errorf("weather service unavailable (status %d): %s", resp.StatusCode, strings.TrimSpace(string(body)))
 	}
 
 	var data EDRFeatureCollection
@@ -162,8 +166,14 @@ func APIWeatherHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if data == nil || len(data.Features) == 0 {
-		log.Println("weather API: no data/features available")
+	if data == nil {
+		log.Println("weather API: empty response body")
+		writeJSON(w, http.StatusServiceUnavailable, APIErrorResponse{Error: "weather service unavailable"})
+		return
+	}
+
+	if len(data.Features) == 0 {
+		log.Println("weather API: empty feature list")
 		writeJSON(w, http.StatusServiceUnavailable, APIErrorResponse{Error: "weather service unavailable"})
 		return
 	}
