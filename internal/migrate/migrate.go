@@ -1,18 +1,44 @@
 package migrate
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 )
+
+const migrationLockID int64 = 8675309
 
 // RunMigrations applies all pending .sql migrations found in the migrations/ folder.
 // Each migration is executed in a transaction and recorded in schema_migrations.
 func RunMigrations(db *sql.DB) error {
-	if err := ensureSchemaMigrationsTable(db); err != nil {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// Run everything on a single connection to ensure advisory lock is held consistently.
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get DB connection for migrations: %w", err)
+	}
+	defer func() { _ = conn.Close() }()
+
+	locked := false
+	defer func() {
+		if locked {
+			_, _ = conn.ExecContext(context.Background(), "SELECT pg_advisory_unlock($1)", migrationLockID)
+		}
+	}()
+
+	if _, err := conn.ExecContext(ctx, "SELECT pg_advisory_lock($1)", migrationLockID); err != nil {
+		return fmt.Errorf("failed to acquire migration advisory lock: %w", err)
+	}
+	locked = true
+
+	if err := ensureSchemaMigrationsTable(ctx, conn); err != nil {
 		return err
 	}
 
@@ -24,7 +50,7 @@ func RunMigrations(db *sql.DB) error {
 	for _, file := range files {
 		version := migrationVersionFromFile(file)
 
-		applied, err := migrationApplied(db, version)
+		applied, err := migrationApplied(ctx, conn, version)
 		if err != nil {
 			return err
 		}
@@ -33,7 +59,7 @@ func RunMigrations(db *sql.DB) error {
 			continue
 		}
 
-		if err := applyMigrationFile(db, version, file); err != nil {
+		if err := applyMigrationFile(ctx, conn, version, file); err != nil {
 			return err
 		}
 	}
@@ -43,8 +69,8 @@ func RunMigrations(db *sql.DB) error {
 }
 
 // ensureSchemaMigrationsTable makes sure the schema_migrations table exists.
-func ensureSchemaMigrationsTable(db *sql.DB) error {
-	_, err := db.Exec(`
+func ensureSchemaMigrationsTable(ctx context.Context, conn *sql.Conn) error {
+	_, err := conn.ExecContext(ctx, `
 		CREATE TABLE IF NOT EXISTS schema_migrations (
 			version VARCHAR(255) PRIMARY KEY
 		);
@@ -76,9 +102,10 @@ func migrationVersionFromFile(path string) string {
 }
 
 // migrationApplied checks whether a given migration version is already recorded.
-func migrationApplied(db *sql.DB, version string) (bool, error) {
+func migrationApplied(ctx context.Context, conn *sql.Conn, version string) (bool, error) {
 	var count int
-	err := db.QueryRow(
+	err := conn.QueryRowContext(
+		ctx,
 		"SELECT COUNT(*) FROM schema_migrations WHERE version = $1",
 		version,
 	).Scan(&count)
@@ -89,7 +116,7 @@ func migrationApplied(db *sql.DB, version string) (bool, error) {
 }
 
 // applyMigrationFile runs a single migration file inside a transaction and records it.
-func applyMigrationFile(db *sql.DB, version, file string) error {
+func applyMigrationFile(ctx context.Context, conn *sql.Conn, version, file string) error {
 	content, err := os.ReadFile(file)
 	if err != nil {
 		return fmt.Errorf("failed to read migration %s: %w", file, err)
@@ -97,20 +124,21 @@ func applyMigrationFile(db *sql.DB, version, file string) error {
 
 	fmt.Println("Applying migration:", version)
 
-	tx, err := db.Begin()
+	tx, err := conn.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction for migration %s: %w", version, err)
 	}
 
 	statements := splitSQLStatements(string(content))
 	for _, stmt := range statements {
-		if _, err := tx.Exec(stmt); err != nil {
+		if _, err := tx.ExecContext(ctx, stmt); err != nil {
 			_ = tx.Rollback()
 			return fmt.Errorf("migration %s failed: %w", version, err)
 		}
 	}
 
-	if _, err := tx.Exec(
+	if _, err := tx.ExecContext(
+		ctx,
 		"INSERT INTO schema_migrations (version) VALUES ($1)",
 		version,
 	); err != nil {
@@ -145,15 +173,28 @@ func splitSQLStatements(content string) []string {
 			for tagEnd < len(content) && isDollarTagChar(content[tagEnd]) {
 				tagEnd++
 			}
+
 			if tagEnd < len(content) && content[tagEnd] == '$' {
 				tag := content[i+1 : tagEnd]
-				if inDollar && tag == dollarTag {
-					inDollar = false
-					dollarTag = ""
-				} else if !inDollar {
-					inDollar = true
-					dollarTag = tag
+
+				// If we're already inside a dollar-quoted block:
+				// - only the matching tag closes it
+				// - other tags are treated as content
+				if inDollar {
+					if tag == dollarTag {
+						inDollar = false
+						dollarTag = ""
+					}
+					for j := i; j <= tagEnd; j++ {
+						buf.WriteByte(content[j])
+					}
+					i = tagEnd
+					continue
 				}
+
+				// Not in a dollar block -> start one
+				inDollar = true
+				dollarTag = tag
 				for j := i; j <= tagEnd; j++ {
 					buf.WriteByte(content[j])
 				}
@@ -162,7 +203,7 @@ func splitSQLStatements(content string) []string {
 			}
 		}
 
-		// Handle single-quoted strings, respecting escaped quotes.
+		// Handle single-quoted strings, respecting escaped quotes ('' inside strings).
 		if !inDollar && ch == '\'' {
 			buf.WriteByte(ch)
 			if inSingle {
