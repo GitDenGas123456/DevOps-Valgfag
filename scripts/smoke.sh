@@ -1,11 +1,28 @@
 #!/usr/bin/env bash
-URL="http://127.0.0.1:8080/healthz"
+set -euo pipefail
 
-echo "Checking $URL..."
-if curl -fsS --retry 30 --retry-delay 1 --retry-all-errors "$URL" | grep -q '^ok$'; then
-  echo "Health check passed ✅"
-  exit 0
-else
-  echo "Health check failed ❌"
-  exit 1
-fi
+BASE_URL="${BASE_URL:-http://127.0.0.1:8080}"
+
+check() {
+  local path="$1"
+  local expected="${2:-}"
+
+  echo "Checking ${BASE_URL}${path}..."
+  out="$(curl -fsS --retry 30 --retry-delay 1 --retry-all-errors --max-time 2 "${BASE_URL}${path}")"
+
+  if [ -n "${expected}" ]; then
+    echo "${out}" | grep -q "^${expected}$"
+  fi
+}
+
+# Liveness: process is up
+check "/healthz" "ok"
+echo "Health check passed ✅"
+
+# Readiness: DB reachable (may fail if DB not ready yet, hence retry)
+check "/readyz" "ok"
+echo "Readiness check passed ✅"
+
+# Metrics endpoint exists (Prometheus scrape target)
+check "/metrics"
+echo "Metrics endpoint reachable ✅"

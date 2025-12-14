@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
   pull_request:
-    branches: [ main, develop ]
+    branches: [main, develop]
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -15,30 +15,31 @@ jobs:
   # Build + lint + tests
   # -------------------------
   build:
-    env:
-      POSTGRES_USER: ${{ vars.CI_POSTGRES_USER || 'devops' }}
-      POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD }}
-      POSTGRES_DB: ${{ vars.CI_POSTGRES_DB || 'whoknows' }}
     runs-on: ubuntu-latest
+    env:
+      POSTGRES_USER: ${{ secrets.CI_POSTGRES_USER || vars.CI_POSTGRES_USER || 'devops' }}
+      POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD || 'devops' }}
+      POSTGRES_DB: ${{ secrets.CI_POSTGRES_DB || vars.CI_POSTGRES_DB || 'whoknows' }}
+
     services:
       postgres:
         image: postgres:16
         env:
-          # vigtige: env.* virker IKKE her, så vi gentager expressions
-          POSTGRES_USER: ${{ vars.CI_POSTGRES_USER || 'devops' }}
-          POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD }}
-          POSTGRES_DB: ${{ vars.CI_POSTGRES_DB || 'whoknows' }}
+          # Important: env.* does NOT work here, so we repeat the expressions
+          POSTGRES_USER: ${{ secrets.CI_POSTGRES_USER || vars.CI_POSTGRES_USER || 'devops' }}
+          POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD || 'devops' }}
+          POSTGRES_DB: ${{ secrets.CI_POSTGRES_DB || vars.CI_POSTGRES_DB || 'whoknows' }}
         ports:
           - 5432:5432
         options: >-
-          --health-cmd="pg_isready -U ${{ vars.CI_POSTGRES_USER || 'devops' }} -d ${{ vars.CI_POSTGRES_DB || 'whoknows' }}"
+          --health-cmd="pg_isready -U ${{ secrets.CI_POSTGRES_USER || vars.CI_POSTGRES_USER || 'devops' }} -d ${{ secrets.CI_POSTGRES_DB || vars.CI_POSTGRES_DB || 'whoknows' }}"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
 
     strategy:
       matrix:
-        go-version: [ "1.25.x" ]
+        go-version: ["1.25.x"]
 
     steps:
       - name: Checkout repository
@@ -63,13 +64,13 @@ jobs:
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v8
         with:
-          version: latest
+          version: v1.60.3
           args: ./...
 
       - name: Run tests (race + coverage)
         env:
-          # her må vi godt bruge env.*, de kommer fra job-level env
           DATABASE_URL: postgres://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@localhost:5432/${{ env.POSTGRES_DB }}?sslmode=disable
+          TEST_DATABASE_URL: postgres://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@localhost:5432/${{ env.POSTGRES_DB }}?sslmode=disable
         run: |
           go test -v -race ./... \
             -coverpkg=./cmd/server,./handlers,./internal/db \
@@ -108,20 +109,21 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     env:
-      POSTGRES_USER: ${{ vars.CI_POSTGRES_USER || 'devops' }}
-      POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD }}
-      POSTGRES_DB: ${{ vars.CI_POSTGRES_DB || 'whoknows' }}
+      POSTGRES_USER: ${{ secrets.CI_POSTGRES_USER || vars.CI_POSTGRES_USER || 'devops' }}
+      POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD || 'devops' }}
+      POSTGRES_DB: ${{ secrets.CI_POSTGRES_DB || vars.CI_POSTGRES_DB || 'whoknows' }}
+
     services:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_USER: ${{ vars.CI_POSTGRES_USER || 'devops' }}
-          POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD }}
-          POSTGRES_DB: ${{ vars.CI_POSTGRES_DB || 'whoknows' }}
+          POSTGRES_USER: ${{ secrets.CI_POSTGRES_USER || vars.CI_POSTGRES_USER || 'devops' }}
+          POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD || 'devops' }}
+          POSTGRES_DB: ${{ secrets.CI_POSTGRES_DB || vars.CI_POSTGRES_DB || 'whoknows' }}
         ports:
           - 5432:5432
         options: >-
-          --health-cmd="pg_isready -U ${{ vars.CI_POSTGRES_USER || 'devops' }} -d ${{ vars.CI_POSTGRES_DB || 'whoknows' }}"
+          --health-cmd="pg_isready -U ${{ secrets.CI_POSTGRES_USER || vars.CI_POSTGRES_USER || 'devops' }} -d ${{ secrets.CI_POSTGRES_DB || vars.CI_POSTGRES_DB || 'whoknows' }}"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
@@ -143,12 +145,16 @@ jobs:
       - name: Start server
         env:
           DATABASE_URL: postgres://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@localhost:5432/${{ env.POSTGRES_DB }}?sslmode=disable
+          SESSION_KEY: ci-session-key-0123456789-abcdefghijklmnopqrstuvwxyz
+          APP_ENV: prod
         run: |
           nohup ./server > app.log 2>&1 &
           echo $! > app.pid
           sleep 2
 
-      - name: Smoke test /healthz
+      - name: Smoke test /healthz, /readyz, /metrics
+        env:
+          BASE_URL: http://127.0.0.1:8080
         run: scripts/smoke.sh
 
       - name: Stop server & upload logs
@@ -195,13 +201,15 @@ jobs:
             ghcr.io/gitdengas123456/devops-valgfag:latest
 
   # -------------------------
-  # Deploy to VM via SSH (compose + migrate)
+  # Deploy to VM via SSH (compose + .env)
   # -------------------------
   deploy:
     needs: docker-build
     runs-on: ubuntu-latest
     environment: produktion
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout code (for reference)
@@ -209,6 +217,22 @@ jobs:
 
       - name: Deploy to VM via SSH
         uses: appleboy/ssh-action@v1.1.0
+        env:
+          POSTGRES_USER: ${{ vars.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ vars.POSTGRES_DB }}
+
+          SESSION_KEY: ${{ secrets.SESSION_KEY }}
+          DMI_API_KEY: ${{ secrets.DMI_API_KEY }}
+
+          GF_SECURITY_ADMIN_USER: ${{ secrets.GF_SECURITY_ADMIN_USER }}
+          GF_SECURITY_ADMIN_PASSWORD: ${{ secrets.GF_SECURITY_ADMIN_PASSWORD }}
+
+          # If docker-compose.yml uses ${VAR:?} guards, these must exist.
+          APP_IMAGE_TAG: ${{ vars.APP_IMAGE_TAG || 'latest' }}
+          NODE_EXPORTER_IMAGE: ${{ vars.NODE_EXPORTER_IMAGE || 'prom/node-exporter:latest' }}
+          PROMETHEUS_IMAGE: ${{ vars.PROMETHEUS_IMAGE || 'prom/prometheus:latest' }}
+          GRAFANA_IMAGE: ${{ vars.GRAFANA_IMAGE || 'grafana/grafana:latest' }}
         with:
           host: ${{ vars.PROD_SSH_HOST }}
           username: ${{ vars.PROD_SSH_USER }}
@@ -217,20 +241,53 @@ jobs:
           script: |
             set -e
 
-            echo "==> Går til app-mappe på VM..."
+            if [ -z "${POSTGRES_USER}" ] || [ -z "${POSTGRES_DB}" ] || [ -z "${POSTGRES_PASSWORD}" ]; then
+              echo "Missing POSTGRES_USER/POSTGRES_DB (vars) or POSTGRES_PASSWORD (secret) in environment 'produktion'"
+              exit 1
+            fi
+
+            if [ -z "${SESSION_KEY}" ] || [ -z "${DMI_API_KEY}" ]; then
+              echo "Missing SESSION_KEY or DMI_API_KEY in environment 'produktion'"
+              exit 1
+            fi
+
+            echo "==> Going to app folder on VM..."
             cd ${{ vars.DEPLOY_PATH }}
 
             echo "==> Sync repo to origin/main..."
             git fetch origin main
             git reset --hard origin/main
 
-            echo "==> Puller seneste image fra GHCR..."
+            echo "==> Writing .env on VM..."
+            umask 077
+            cat > .env <<EOF
+            APP_ENV=prod
+            PORT=8080
+
+            POSTGRES_USER=${POSTGRES_USER}
+            POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+            POSTGRES_DB=${POSTGRES_DB}
+
+            SESSION_KEY=${SESSION_KEY}
+            DMI_API_KEY=${DMI_API_KEY}
+
+            GF_SECURITY_ADMIN_USER=${GF_SECURITY_ADMIN_USER}
+            GF_SECURITY_ADMIN_PASSWORD=${GF_SECURITY_ADMIN_PASSWORD}
+
+            APP_IMAGE_TAG=${APP_IMAGE_TAG}
+            NODE_EXPORTER_IMAGE=${NODE_EXPORTER_IMAGE}
+            PROMETHEUS_IMAGE=${PROMETHEUS_IMAGE}
+            GRAFANA_IMAGE=${GRAFANA_IMAGE}
+            EOF
+            chmod 600 .env
+
+            echo "==> Pulling latest image from GHCR..."
             docker compose pull
 
-            echo "==> Starter/retstarter compose stack..."
+            echo "==> Starting/restarting compose stack..."
             docker compose up -d --remove-orphans
 
-            echo "==> Rydder gamle images..."
+            echo "==> Cleaning up old images..."
             docker image prune -f
 
             echo "Deployment finished."

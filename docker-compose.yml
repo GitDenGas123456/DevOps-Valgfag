@@ -2,29 +2,39 @@ version: "3.9"
 
 services:
   whoknows-app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: devops-valgfag-app
+    image: ghcr.io/gitdengas123456/devops-valgfag:${APP_IMAGE_TAG:?set APP_IMAGE_TAG in .env (e.g. latest, v1.2.3 or commit SHA)}
     container_name: whoknows-app
     ports:
       - "8080:8080"
     env_file:
       - .env
     environment:
-      # We let .env control most settings (SESSION_KEY, DMI_API_KEY, etc.)
-      # The app constructs its own PostgreSQL DSN from POSTGRES_* (and DB_HOST) via resolvePostgresDSN.
-      PORT: 8080
-      APP_ENV: prod
-      # Set to 0 until Postgres FTS is implemented; set to 1 when tsvector search is ready
-      SEARCH_FTS: 0
-      # Explicitly tell the app which host to use for Postgres (matches the service name below)
+      PORT: "8080"
+      APP_ENV: "prod"
+
+      # Feature flags
+      SEARCH_FTS: "0"
+      EXTERNAL_SEARCH: ${EXTERNAL_SEARCH:-1}
+      WIKI_USER_AGENT: ${WIKI_USER_AGENT:-devops-valgfag/1.0}
+
+      # Postgres host (service name)
       DB_HOST: postgres_db
-      SESSION_KEY: ${SESSION_KEY}
-      DMI_API_KEY: ${DMI_API_KEY}
+
+      # Required secrets/config
+      SESSION_KEY: ${SESSION_KEY:?SESSION_KEY is required}
+      DMI_API_KEY: ${DMI_API_KEY:?DMI_API_KEY is required}
+
     depends_on:
       postgres_db:
         condition: service_healthy
+
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
     restart: unless-stopped
 
   postgres_db:
@@ -34,21 +44,22 @@ services:
     env_file:
       - .env
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-whoknows}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
     ports:
-      - "5432:5432"   # Can be removed in production, but useful for development
+      # Bind only to localhost (good default for a single-VM setup)
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
 
   node_exporter:
-    image: prom/node-exporter:latest
+    image: ${NODE_EXPORTER_IMAGE:?set NODE_EXPORTER_IMAGE in .env (pin a version, avoid :latest)}
     container_name: node_exporter
     ports:
       - "9100:9100"
@@ -65,7 +76,7 @@ services:
     restart: unless-stopped
 
   prometheus:
-    image: prom/prometheus:latest
+    image: ${PROMETHEUS_IMAGE:?set PROMETHEUS_IMAGE in .env (pin a version, avoid :latest)}
     container_name: prometheus
     ports:
       - "9090:9090"
@@ -78,15 +89,15 @@ services:
     restart: unless-stopped
 
   grafana:
-    image: grafana/grafana:latest
+    image: ${GRAFANA_IMAGE:?set GRAFANA_IMAGE in .env (pin a version, avoid :latest)}
     container_name: grafana
     ports:
       - "3000:3000"
     env_file:
       - .env
     environment:
-      GF_SECURITY_ADMIN_USER: ${GF_SECURITY_ADMIN_USER}
-      GF_SECURITY_ADMIN_PASSWORD: ${GF_SECURITY_ADMIN_PASSWORD}
+      GF_SECURITY_ADMIN_USER: ${GF_SECURITY_ADMIN_USER:?set GF_SECURITY_ADMIN_USER in .env}
+      GF_SECURITY_ADMIN_PASSWORD: ${GF_SECURITY_ADMIN_PASSWORD:?set GF_SECURITY_ADMIN_PASSWORD in .env}
     volumes:
       - grafana-storage:/var/lib/grafana
       - ./monitoring/grafana/search-monitoring-dashboard.json:/var/lib/grafana/dashboards/search-monitoring-dashboard.json:ro
