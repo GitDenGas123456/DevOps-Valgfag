@@ -104,7 +104,7 @@ func GetCopenhagenForecast(ctx context.Context) (*EDRFeatureCollection, error) {
 	}()
 
 	if resp.StatusCode != http.StatusOK {
-		// læs en lille smule af body for bedre fejlsøgning (uden at spamme logs)
+		// Read a small part of the body for better debugging (without spamming logs)
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
 		return nil, fmt.Errorf("weather service unavailable (status %d): %s", resp.StatusCode, strings.TrimSpace(string(body)))
 	}
