@@ -1,4 +1,4 @@
-// NOTE:
+// NEW NOTE:
 // This seeding helper is **SQLite-only** and intended for local demos/tests.
 // It uses SQLite-specific syntax (e.g. INSERT OR IGNORE) and is **not**
 // called from the PostgreSQL runtime code path.
