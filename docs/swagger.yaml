@@ -52,7 +52,7 @@ definitions:
     type: object
 info:
   contact: {}
-  description: Application user with login credentials
+  description: HTTP API for the WhoKnows application, providing authentication, search, and weather services.
   title: WhoKnows API
   version: 0.1.0
 paths:
