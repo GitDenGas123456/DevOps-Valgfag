@@ -124,7 +124,7 @@ func SearchPageHandler(w http.ResponseWriter, r *http.Request) {
 				if err != nil {
 					log.Println("WikipediaSearch error:", err)
 				} else if len(scraped) > 0 {
-					store := []dbx.ExternalResult{}
+					store := make([]dbx.ExternalResult, 0, len(scraped))
 					for _, s := range scraped {
 						store = append(store, dbx.ExternalResult{
 							Title:   s.Title,
@@ -282,7 +282,7 @@ func APISearchHandler(w http.ResponseWriter, r *http.Request) {
 				if err != nil {
 					log.Println("WikipediaSearch error:", err)
 				} else if len(scraped) > 0 {
-					store := []dbx.ExternalResult{}
+					store := make([]dbx.ExternalResult, 0, len(scraped))
 					for _, s := range scraped {
 						store = append(store, dbx.ExternalResult{
 							Title:   s.Title,
