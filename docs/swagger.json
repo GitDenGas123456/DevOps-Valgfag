@@ -1,7 +1,7 @@
 {
     "swagger": "2.0",
     "info": {
-        "description": "Application user with login credentials",
+        "description": "API for the WhoKnows application",
         "title": "WhoKnows API",
         "contact": {},
         "version": "0.1.0"
