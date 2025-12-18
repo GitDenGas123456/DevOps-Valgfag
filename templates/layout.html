@@ -63,30 +63,21 @@
   <script>
     document.addEventListener('DOMContentLoaded', () => {
       const searchForm = document.getElementById('search-form');
-      const searchInput = document.getElementById('search-input');
+      if (!searchForm) return;
 
-      if (!searchForm || !searchInput) return;
+      // Preserve current language query param (if present) by injecting a hidden input.
+      const params = new URLSearchParams(globalThis.location.search);
+      const language = params.get('language');
+      if (!language) return;
 
-      searchForm.addEventListener('submit', (e) => {
-        // We redirect to /search to ensure metrics split by route
-        e.preventDefault();
-
-        const query = (searchInput.value || '').trim();
-        const url = new URL('/search', globalThis.location.origin);
-
-        if (query) {
-          url.searchParams.set('q', query);
-        }
-
-        // Preserve current language query param if present in the page URL
-        const params = new URLSearchParams(globalThis.location.search);
-        const language = params.get('language');
-        if (language) {
-          url.searchParams.set('language', language);
-        }
-
-        globalThis.location.href = url.toString();
-      });
+      let hidden = searchForm.querySelector('input[name="language"]');
+      if (!hidden) {
+        hidden = document.createElement('input');
+        hidden.type = 'hidden';
+        hidden.name = 'language';
+        searchForm.appendChild(hidden);
+      }
+      hidden.value = language;
     });
   </script>
 </body>
