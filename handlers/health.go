@@ -19,9 +19,7 @@ func Healthz(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 
 	// If the client disconnects while writing, Write may error.
-	if _, err := w.Write([]byte("ok")); err != nil {
-		_ = err
-	}
+	_, _ = w.Write([]byte("ok"))
 }
 
 // Readyz godoc
@@ -40,7 +38,7 @@ func Readyz(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Iindependent short timeout context so readiness isn't tied to client context,
+	// Independent short timeout context so readiness isn't tied to client context,
 	// and so it won't hang indefinitely if DB stalls.
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
