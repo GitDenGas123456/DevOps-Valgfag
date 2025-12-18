@@ -153,90 +153,138 @@ func applyMigrationFile(ctx context.Context, conn *sql.Conn, version, file strin
 	return nil
 }
 
+type splitState struct {
+	inSingle  bool
+	inDollar  bool
+	dollarTag string
+}
+
+type dollarParse struct {
+	ok     bool
+	tagEnd int
+	tag    string
+}
+
 // splitSQLStatements breaks a migration file into individual statements.
 // It keeps semicolons inside single quotes and dollar-quoted blocks intact.
 func splitSQLStatements(content string) []string {
 	var (
 		statements []string
 		buf        strings.Builder
-		inSingle   bool
-		inDollar   bool
-		dollarTag  string
+		st         splitState
 	)
 
 	for i := 0; i < len(content); i++ {
 		ch := content[i]
 
-		// Handle dollar-quoted strings: $$...$$ or $tag$...$tag$
-		if !inSingle && ch == '$' {
-			tagEnd := i + 1
-			for tagEnd < len(content) && isDollarTagChar(content[tagEnd]) {
-				tagEnd++
-			}
-
-			if tagEnd < len(content) && content[tagEnd] == '$' {
-				tag := content[i+1 : tagEnd]
-
-				// If we're already inside a dollar-quoted block:
-				// - only the matching tag closes it
-				// - other tags are treated as content
-				if inDollar {
-					if tag == dollarTag {
-						inDollar = false
-						dollarTag = ""
-					}
-					for j := i; j <= tagEnd; j++ {
-						buf.WriteByte(content[j])
-					}
-					i = tagEnd
-					continue
-				}
-
-				// Not in a dollar block -> start one
-				inDollar = true
-				dollarTag = tag
-				for j := i; j <= tagEnd; j++ {
-					buf.WriteByte(content[j])
-				}
-				i = tagEnd
-				continue
-			}
-		}
-
-		// Handle single-quoted strings, respecting escaped quotes ('' inside strings).
-		if !inDollar && ch == '\'' {
-			buf.WriteByte(ch)
-			if inSingle {
-				if i+1 < len(content) && content[i+1] == '\'' {
-					buf.WriteByte(content[i+1])
-					i++
-					continue
-				}
-				inSingle = false
-			} else {
-				inSingle = true
-			}
+		if tryHandleDollarStartOrEnd(content, &i, ch, &st, &buf) {
 			continue
 		}
 
-		// Statement boundary: semicolon outside strings/blocks.
-		if ch == ';' && !inSingle && !inDollar {
-			stmt := strings.TrimSpace(buf.String())
-			if stmt != "" {
-				statements = append(statements, stmt)
-			}
-			buf.Reset()
+		if tryHandleSingleQuote(content, &i, ch, &st, &buf) {
+			continue
+		}
+
+		if tryHandleStatementBoundary(ch, &st, &buf, &statements) {
 			continue
 		}
 
 		buf.WriteByte(ch)
 	}
 
-	if tail := strings.TrimSpace(buf.String()); tail != "" {
-		statements = append(statements, tail)
+	flushStatement(&buf, &statements)
+	return statements
+}
+
+func tryHandleDollarStartOrEnd(content string, i *int, ch byte, st *splitState, buf *strings.Builder) bool {
+	if st.inSingle || ch != '$' {
+		return false
 	}
 
-	return statements
+	dp := parseDollarTag(content, *i)
+	if !dp.ok {
+		return false
+	}
+
+	// Always write the delimiter ($$ or $tag$) to the buffer.
+	writeRange(buf, content, *i, dp.tagEnd)
+
+	if st.inDollar {
+		// Only matching tag closes.
+		if dp.tag == st.dollarTag {
+			st.inDollar = false
+			st.dollarTag = ""
+		}
+	} else {
+		// Start dollar block.
+		st.inDollar = true
+		st.dollarTag = dp.tag
+	}
+
+	*i = dp.tagEnd
+	return true
+}
+
+func parseDollarTag(content string, start int) dollarParse {
+	tagEnd := start + 1
+	for tagEnd < len(content) && isDollarTagChar(content[tagEnd]) {
+		tagEnd++
+	}
+	if tagEnd < len(content) && content[tagEnd] == '$' {
+		return dollarParse{
+			ok:     true,
+			tagEnd: tagEnd,
+			tag:    content[start+1 : tagEnd], // may be empty for $$...$$
+		}
+	}
+	return dollarParse{ok: false}
+}
+
+func writeRange(buf *strings.Builder, content string, from, to int) {
+	for j := from; j <= to; j++ {
+		buf.WriteByte(content[j])
+	}
+}
+
+func tryHandleSingleQuote(content string, i *int, ch byte, st *splitState, buf *strings.Builder) bool {
+	if st.inDollar || ch != '\'' {
+		return false
+	}
+
+	buf.WriteByte(ch)
+
+	if st.inSingle {
+		// Escaped single quote inside string: ''
+		if *i+1 < len(content) && content[*i+1] == '\'' {
+			buf.WriteByte(content[*i+1])
+			*i++
+			return true
+		}
+		st.inSingle = false
+		return true
+	}
+
+	st.inSingle = true
+	return true
+}
+
+func tryHandleStatementBoundary(ch byte, st *splitState, buf *strings.Builder, statements *[]string) bool {
+	if ch != ';' || st.inSingle || st.inDollar {
+		return false
+	}
+
+	stmt := strings.TrimSpace(buf.String())
+	if stmt != "" {
+		*statements = append(*statements, stmt)
+	}
+	buf.Reset()
+	return true
+}
+
+func flushStatement(buf *strings.Builder, statements *[]string) {
+	if tail := strings.TrimSpace(buf.String()); tail != "" {
+		*statements = append(*statements, tail)
+	}
 }
 
 func isDollarTagChar(b byte) bool {

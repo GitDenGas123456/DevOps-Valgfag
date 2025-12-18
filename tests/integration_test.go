@@ -46,14 +46,15 @@ func setupTestServer(t *testing.T) (*mux.Router, *sql.DB) {
 
 	// Router setup
 	r := mux.NewRouter()
-	r.HandleFunc("/", h.SearchPageHandler).Methods("GET")
+	r.HandleFunc("/", h.HomePageHandler).Methods("GET")
+	r.HandleFunc("/search", h.SearchPageHandler).Methods("GET")
 	r.HandleFunc("/about", h.AboutPageHandler).Methods("GET")
 	r.HandleFunc("/login", h.LoginPageHandler).Methods("GET")
 	r.HandleFunc("/register", h.RegisterPageHandler).Methods("GET")
 	r.HandleFunc("/api/login", h.APILoginHandler).Methods("POST")
 	r.HandleFunc("/api/register", h.APIRegisterHandler).Methods("POST")
 	r.HandleFunc("/api/logout", h.APILogoutHandler).Methods("POST", "GET")
-	r.HandleFunc("/api/search", h.APISearchHandler).Methods("POST")
+	r.HandleFunc("/api/search", h.APISearchHandler).Methods("GET")
 	r.HandleFunc("/healthz", h.Healthz).Methods("GET")
 
 	return r, db
@@ -101,7 +102,7 @@ func TestIntegration_RegisterLoginSearch(t *testing.T) {
 	// 3. Perform a search
 	form = url.Values{}
 	form.Set("q", "test")
-	req = httptest.NewRequest("POST", "/api/search?q=test", strings.NewReader(form.Encode()))
+	req = httptest.NewRequest("GET", "/api/search?q=test", strings.NewReader(form.Encode()))
 	for _, c := range cookies {
 		req.AddCookie(c)
 	}

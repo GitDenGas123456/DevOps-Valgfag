@@ -61,36 +61,33 @@
   </footer>
 
   <script>
-    let searchInput;
-
     document.addEventListener('DOMContentLoaded', () => {
-      searchInput = document.getElementById('search-input');
-      if (searchInput) {
-        searchInput.addEventListener('keypress', (e) => {
-          if (e.key === 'Enter') {
-            e.preventDefault();
-            makeSearchRequest();
-          }
-        });
-      }
+      const searchForm = document.getElementById('search-form');
+      const searchInput = document.getElementById('search-input');
+
+      if (!searchForm || !searchInput) return;
+
+      searchForm.addEventListener('submit', (e) => {
+        // We redirect to /search to ensure metrics split by route
+        e.preventDefault();
+
+        const query = (searchInput.value || '').trim();
+        const url = new URL('/search', globalThis.location.origin);
+
+        if (query) {
+          url.searchParams.set('q', query);
+        }
+
+        // Preserve current language query param if present in the page URL
+        const params = new URLSearchParams(globalThis.location.search);
+        const language = params.get('language');
+        if (language) {
+          url.searchParams.set('language', language);
+        }
+
+        globalThis.location.href = url.toString();
+      });
     });
-
-    function makeSearchRequest() {
-      const query = (searchInput && searchInput.value) || '';
-      const url = new URL('/search', window.location.origin);
-
-      if (query) {
-        url.searchParams.set('q', query);
-      }
-
-      const params = new URLSearchParams(window.location.search);
-      const language = params.get('language');
-      if (language) {
-        url.searchParams.set('language', language);
-      }
-
-      window.location.href = url.toString();
-    }
   </script>
 </body>
 </html>

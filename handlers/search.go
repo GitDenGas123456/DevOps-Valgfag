@@ -3,6 +3,7 @@ package handlers
 import (
 	"log"
 	"net/http"
+	"sync/atomic"
 
 	dbx "devops-valgfag/internal/db"
 	"devops-valgfag/internal/metrics"
@@ -11,8 +12,13 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-var useFTSSearch bool
-var externalEnabled = true
+var useFTSSearch atomic.Bool
+var externalEnabled atomic.Bool
+
+func init() {
+	// Default: external Wikipedia enrichment ON (same behavior as before)
+	externalEnabled.Store(true)
+}
 
 const (
 	pageLimit       = 50
@@ -21,21 +27,44 @@ const (
 
 // EnableFTSSearch toggles FTS usage for search endpoints.
 func EnableFTSSearch(on bool) {
-	useFTSSearch = on
+	useFTSSearch.Store(on)
 }
 
 // EnableExternalSearch toggles external Wikipedia enrichment.
 func EnableExternalSearch(on bool) {
-	externalEnabled = on
+	externalEnabled.Store(on)
 }
 
 // SearchResult represents a single search result row.
 type SearchResult struct {
-	ID          int
-	Title       string
-	URL         string
-	Language    string
-	Description string
+	ID          int    `json:"id"`
+	Title       string `json:"title"`
+	URL         string `json:"url"`
+	Language    string `json:"language"`
+	Description string `json:"description"`
+}
+
+// APISearchResponse is the JSON payload returned by the search API.
+type APISearchResponse struct {
+	SearchResults []SearchResult `json:"search_results"`
+}
+
+// HomePageHandler renders the landing page and redirects searches to /search.
+func HomePageHandler(w http.ResponseWriter, r *http.Request) {
+	if q := r.URL.Query().Get("q"); q != "" {
+		target := "/search"
+		if raw := r.URL.RawQuery; raw != "" {
+			target += "?" + raw
+		}
+		http.Redirect(w, r, target, http.StatusFound)
+		return
+	}
+
+	renderTemplate(w, r, "search", map[string]any{
+		"Title":   "Home",
+		"Query":   "",
+		"Results": []SearchResult{},
+	})
 }
 
 // -----------------------------------------------------------------------------
@@ -66,7 +95,7 @@ func SearchPageHandler(w http.ResponseWriter, r *http.Request) {
 		rows, err := db.Query(
 			`SELECT id, title, url, language, content
 			 FROM pages
-			 WHERE language = $1 
+			 WHERE language = $1
 			   AND (title ILIKE $2 OR content ILIKE $2)
 			 LIMIT $3`,
 			language, "%"+q+"%", pageLimit,
@@ -86,7 +115,7 @@ func SearchPageHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		if externalEnabled {
+		if externalEnabled.Load() {
 			// ---------------------------
 			// Stage 2 - Wikipedia search when NOT cached
 			// ---------------------------
@@ -141,6 +170,15 @@ func SearchPageHandler(w http.ResponseWriter, r *http.Request) {
 // -----------------------------------------------------------------------------
 // API SEARCH HANDLER (PostgreSQL-compatible)
 // -----------------------------------------------------------------------------
+// APISearchHandler godoc
+// @Summary      Search content
+// @Description  Search stored pages and cached external results.
+// @Tags         Search
+// @Produce      json
+// @Param        q          query  string  false  "Search query"
+// @Param        language   query  string  false  "Language code (default en)"
+// @Success      200  {object}  APISearchResponse  "Search results"
+// @Router       /api/search [get]
 func APISearchHandler(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query().Get("q")
 
@@ -165,7 +203,7 @@ func APISearchHandler(w http.ResponseWriter, r *http.Request) {
 		// ---------------------------------------------------------------------
 		// FTS SEARCH (PostgreSQL content_tsv)
 		// ---------------------------------------------------------------------
-		if useFTSSearch {
+		if useFTSSearch.Load() {
 			// Use a CTE so plainto_tsquery($2) is parsed only once.
 			ftsQuery := `
 				WITH q AS (SELECT plainto_tsquery($2) AS query)
@@ -235,7 +273,7 @@ func APISearchHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		if externalEnabled {
+		if externalEnabled.Load() {
 			// ---------------------------
 			// Stage 2 - Wikipedia search when NOT cached
 			// ---------------------------
@@ -282,7 +320,7 @@ func APISearchHandler(w http.ResponseWriter, r *http.Request) {
 		metrics.SearchWithResult.Inc()
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{
-		"search_results": results,
+	writeJSON(w, http.StatusOK, APISearchResponse{
+		SearchResults: results,
 	})
 }
