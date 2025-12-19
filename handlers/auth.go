@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"log"
 	"net/http"
 
 	"golang.org/x/crypto/bcrypt"
@@ -23,9 +24,20 @@ type User struct {
 // APILoginHandler handles user login requests.
 // It validates the incoming form, checks the database for a matching user,
 // and verifies the password using bcrypt.
+//
+// APILoginHandler godoc
+// @Summary      User login
+// @Description  Authenticate a user and start a session.
+// @Tags         Auth
+// @Accept       application/x-www-form-urlencoded
+// @Produce      html
+// @Param        username  formData  string  true   "Username"
+// @Param        password  formData  string  true   "Password"
+// @Success      302  {string}  string  "Redirect to home page"
+// @Failure      200  {string}  string  "Rendered login form with errors"
+// @Router       /api/login [post]
 func APILoginHandler(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		// Render an HTML error page for bad requests
 		renderTemplate(w, r, "login", map[string]any{
 			"Title": loginTitle,
 			"error": "Bad request",
@@ -55,9 +67,27 @@ func APILoginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create a session for the authenticated user
-	sess, _ := sessionStore.Get(r, "session")
+	sess, err := sessionStore.Get(r, "session")
+	if err != nil {
+		log.Printf("sessionStore.Get error (login): %v", err)
+		renderTemplate(w, r, "login", map[string]any{
+			"Title":    loginTitle,
+			"error":    "Internal server error",
+			"username": username,
+		})
+		return
+	}
+
 	sess.Values["user_id"] = u.ID
-	_ = sess.Save(r, w)
+	if err := sess.Save(r, w); err != nil {
+		log.Printf("sess.Save error (login): %v", err)
+		renderTemplate(w, r, "login", map[string]any{
+			"Title":    loginTitle,
+			"error":    "Internal server error",
+			"username": username,
+		})
+		return
+	}
 
 	http.Redirect(w, r, "/", http.StatusFound)
 }
@@ -65,9 +95,22 @@ func APILoginHandler(w http.ResponseWriter, r *http.Request) {
 // APIRegisterHandler handles new user registration.
 // It validates input, checks for existing usernames, hashes the password,
 // and inserts the user into PostgreSQL.
+//
+// APIRegisterHandler godoc
+// @Summary      Register user
+// @Description  Create a new user account.
+// @Tags         Auth
+// @Accept       application/x-www-form-urlencoded
+// @Produce      html
+// @Param        username   formData  string  true   "Username"
+// @Param        email      formData  string  true   "Email address"
+// @Param        password   formData  string  true   "Password"
+// @Param        password2  formData  string  true   "Password confirmation"
+// @Success      302  {string}  string  "Redirect to login page"
+// @Failure      200  {string}  string  "Rendered register form with errors"
+// @Router       /api/register [post]
 func APIRegisterHandler(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		// Same contract as login: HTML, not JSON
 		renderTemplate(w, r, "register", map[string]any{
 			"Title": registerTitle,
 			"error": "Bad request",
@@ -104,8 +147,8 @@ func APIRegisterHandler(w http.ResponseWriter, r *http.Request) {
 		`SELECT COUNT(*) FROM users WHERE username = $1`,
 		username,
 	).Scan(&exists)
-
 	if err != nil {
+		log.Printf("register exists query error: %v", err)
 		renderTemplate(w, r, "register", map[string]any{
 			"Title": registerTitle,
 			"error": "Database error",
@@ -124,6 +167,7 @@ func APIRegisterHandler(w http.ResponseWriter, r *http.Request) {
 	// Hash the password using bcrypt
 	hash, err := bcrypt.GenerateFromPassword([]byte(pw1), bcrypt.DefaultCost)
 	if err != nil {
+		log.Printf("bcrypt.GenerateFromPassword error: %v", err)
 		renderTemplate(w, r, "register", map[string]any{
 			"Title": registerTitle,
 			"error": "Internal error, please try again",
@@ -136,8 +180,8 @@ func APIRegisterHandler(w http.ResponseWriter, r *http.Request) {
 		`INSERT INTO users (username, email, password) VALUES ($1, $2, $3)`,
 		username, email, string(hash),
 	)
-
 	if err != nil {
+		log.Printf("register insert error: %v", err)
 		renderTemplate(w, r, "register", map[string]any{
 			"Title": registerTitle,
 			"error": "Registration failed",
@@ -150,10 +194,29 @@ func APIRegisterHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // APILogoutHandler logs out the user by removing the session value.
+//
+// APILogoutHandler godoc
+// @Summary      Logout user
+// @Description  Clear the user session and redirect home.
+// @Tags         Auth
+// @Produce      html
+// @Security     sessionAuth
+// @Success      302  {string}  string  "Redirect to home page"
+// @Router       /api/logout [get]
 func APILogoutHandler(w http.ResponseWriter, r *http.Request) {
-	sess, _ := sessionStore.Get(r, "session")
+	sess, err := sessionStore.Get(r, "session")
+	if err != nil {
+		log.Printf("sessionStore.Get error (logout): %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
 	delete(sess.Values, "user_id")
-	_ = sess.Save(r, w)
+	if err := sess.Save(r, w); err != nil {
+		log.Printf("sess.Save error (logout): %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
 
 	http.Redirect(w, r, "/", http.StatusFound)
 }

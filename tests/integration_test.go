@@ -19,6 +19,8 @@ import (
 
 // setupTestServer initializes in-memory DB, templates, sessions, and router
 func setupTestServer(t *testing.T) (*mux.Router, *sql.DB) {
+	t.Helper()
+
 	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatal(err)
@@ -26,6 +28,7 @@ func setupTestServer(t *testing.T) (*mux.Router, *sql.DB) {
 
 	// Seed database schema
 	if err := h.SeedDB(db); err != nil {
+		_ = db.Close()
 		t.Fatal(err)
 	}
 
@@ -46,15 +49,18 @@ func setupTestServer(t *testing.T) (*mux.Router, *sql.DB) {
 
 	// Router setup
 	r := mux.NewRouter()
-	r.HandleFunc("/", h.SearchPageHandler).Methods("GET")
-	r.HandleFunc("/about", h.AboutPageHandler).Methods("GET")
-	r.HandleFunc("/login", h.LoginPageHandler).Methods("GET")
-	r.HandleFunc("/register", h.RegisterPageHandler).Methods("GET")
-	r.HandleFunc("/api/login", h.APILoginHandler).Methods("POST")
-	r.HandleFunc("/api/register", h.APIRegisterHandler).Methods("POST")
-	r.HandleFunc("/api/logout", h.APILogoutHandler).Methods("POST", "GET")
-	r.HandleFunc("/api/search", h.APISearchHandler).Methods("POST")
-	r.HandleFunc("/healthz", h.Healthz).Methods("GET")
+	r.HandleFunc("/", h.HomePageHandler).Methods(http.MethodGet)
+	r.HandleFunc("/search", h.SearchPageHandler).Methods(http.MethodGet)
+	r.HandleFunc("/about", h.AboutPageHandler).Methods(http.MethodGet)
+	r.HandleFunc("/login", h.LoginPageHandler).Methods(http.MethodGet)
+	r.HandleFunc("/register", h.RegisterPageHandler).Methods(http.MethodGet)
+
+	r.HandleFunc("/api/login", h.APILoginHandler).Methods(http.MethodPost)
+	r.HandleFunc("/api/register", h.APIRegisterHandler).Methods(http.MethodPost)
+	r.HandleFunc("/api/logout", h.APILogoutHandler).Methods(http.MethodPost, http.MethodGet)
+	r.HandleFunc("/api/search", h.APISearchHandler).Methods(http.MethodGet)
+
+	r.HandleFunc("/healthz", h.Healthz).Methods(http.MethodGet)
 
 	return r, db
 }
@@ -73,7 +79,8 @@ func TestIntegration_RegisterLoginSearch(t *testing.T) {
 	form.Set("email", "alice@example.com")
 	form.Set("password", "secret")
 	form.Set("password2", "secret")
-	req := httptest.NewRequest("POST", "/api/register", strings.NewReader(form.Encode()))
+
+	req := httptest.NewRequest(http.MethodPost, "/api/register", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rr := httptest.NewRecorder()
 	router.ServeHTTP(rr, req)
@@ -86,7 +93,8 @@ func TestIntegration_RegisterLoginSearch(t *testing.T) {
 	form = url.Values{}
 	form.Set("username", "alice")
 	form.Set("password", "secret")
-	req = httptest.NewRequest("POST", "/api/login", strings.NewReader(form.Encode()))
+
+	req = httptest.NewRequest(http.MethodPost, "/api/login", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rr = httptest.NewRecorder()
 	router.ServeHTTP(rr, req)
@@ -98,13 +106,12 @@ func TestIntegration_RegisterLoginSearch(t *testing.T) {
 	// Extract session cookie
 	cookies := rr.Result().Cookies()
 
-	// 3. Perform a search
-	form = url.Values{}
-	form.Set("q", "test")
-	req = httptest.NewRequest("POST", "/api/search?q=test", strings.NewReader(form.Encode()))
+	// 3. Perform a search (GET => query params in URL, no body)
+	req = httptest.NewRequest(http.MethodGet, "/api/search?q=test", nil)
 	for _, c := range cookies {
 		req.AddCookie(c)
 	}
+
 	rr = httptest.NewRecorder()
 	router.ServeHTTP(rr, req)
 
@@ -118,9 +125,14 @@ func TestIntegration_RegisterLoginSearch(t *testing.T) {
 }
 
 func TestIntegration_Healthz(t *testing.T) {
-	router, _ := setupTestServer(t)
+	router, db := setupTestServer(t)
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Errorf("failed to close db: %v", err)
+		}
+	}()
 
-	req := httptest.NewRequest("GET", "/healthz", nil)
+	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
 	rr := httptest.NewRecorder()
 	router.ServeHTTP(rr, req)
 

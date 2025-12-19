@@ -61,36 +61,24 @@
   </footer>
 
   <script>
-    let searchInput;
-
     document.addEventListener('DOMContentLoaded', () => {
-      searchInput = document.getElementById('search-input');
-      if (searchInput) {
-        searchInput.addEventListener('keypress', (e) => {
-          if (e.key === 'Enter') {
-            e.preventDefault();
-            makeSearchRequest();
-          }
-        });
-      }
-    });
+      const searchForm = document.getElementById('search-form');
+      if (!searchForm) return;
 
-    function makeSearchRequest() {
-      const query = (searchInput && searchInput.value) || '';
-      const url = new URL('/search', window.location.origin);
-
-      if (query) {
-        url.searchParams.set('q', query);
-      }
-
-      const params = new URLSearchParams(window.location.search);
+      // Preserve current language query param (if present) by injecting a hidden input.
+      const params = new URLSearchParams(globalThis.location.search);
       const language = params.get('language');
-      if (language) {
-        url.searchParams.set('language', language);
-      }
+      if (!language) return;
 
-      window.location.href = url.toString();
-    }
+      let hidden = searchForm.querySelector('input[name="language"]');
+      if (!hidden) {
+        hidden = document.createElement('input');
+        hidden.type = 'hidden';
+        hidden.name = 'language';
+        searchForm.appendChild(hidden);
+      }
+      hidden.value = language;
+    });
   </script>
 </body>
 </html>

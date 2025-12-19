@@ -62,6 +62,11 @@ type APIErrorResponse struct {
 	Error string `json:"error"`
 }
 
+const (
+	weatherServiceUnavailableMsg = "weather service unavailable"
+	weatherDataIncompleteMsg     = "weather data incomplete"
+)
+
 var weatherClient = &http.Client{Timeout: 5 * time.Second}
 
 // ==========
@@ -106,7 +111,7 @@ func GetCopenhagenForecast(ctx context.Context) (*EDRFeatureCollection, error) {
 	if resp.StatusCode != http.StatusOK {
 		// Read a small part of the body for better debugging (without spamming logs)
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
-		return nil, fmt.Errorf("weather service unavailable (status %d): %s", resp.StatusCode, strings.TrimSpace(string(body)))
+		return nil, fmt.Errorf("%s (status %d): %s", weatherServiceUnavailableMsg, resp.StatusCode, strings.TrimSpace(string(body)))
 	}
 
 	var data EDRFeatureCollection
@@ -162,26 +167,26 @@ func APIWeatherHandler(w http.ResponseWriter, r *http.Request) {
 	data, err := GetCopenhagenForecast(r.Context())
 	if err != nil {
 		log.Println("weather API fetch error:", err)
-		writeJSON(w, http.StatusServiceUnavailable, APIErrorResponse{Error: "weather service unavailable"})
+		writeJSON(w, http.StatusServiceUnavailable, APIErrorResponse{Error: weatherServiceUnavailableMsg})
 		return
 	}
 
 	if data == nil {
 		log.Println("weather API: empty response body")
-		writeJSON(w, http.StatusServiceUnavailable, APIErrorResponse{Error: "weather service unavailable"})
+		writeJSON(w, http.StatusServiceUnavailable, APIErrorResponse{Error: weatherServiceUnavailableMsg})
 		return
 	}
 
 	if len(data.Features) == 0 {
 		log.Println("weather API: empty feature list")
-		writeJSON(w, http.StatusServiceUnavailable, APIErrorResponse{Error: "weather service unavailable"})
+		writeJSON(w, http.StatusServiceUnavailable, APIErrorResponse{Error: weatherServiceUnavailableMsg})
 		return
 	}
 
 	first := data.Features[0]
 	if len(first.Geometry.Coordinates) < 2 {
 		log.Println("weather API: missing coordinates in response")
-		writeJSON(w, http.StatusServiceUnavailable, APIErrorResponse{Error: "weather data incomplete"})
+		writeJSON(w, http.StatusServiceUnavailable, APIErrorResponse{Error: weatherDataIncompleteMsg})
 		return
 	}
 

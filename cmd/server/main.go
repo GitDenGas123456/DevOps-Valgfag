@@ -1,7 +1,8 @@
 // @title WhoKnows API
 // @version 0.1.0
-// @description API specification for the WhoKnows web application
+// @description API for the WhoKnows web app: session auth, search content, weather forecast, and health/readiness probes.
 // @BasePath /
+
 package main
 
 import (
@@ -12,6 +13,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -66,20 +68,27 @@ func main() {
 	// HTTP port
 	port := getenv("PORT", "8080")
 
+	// Env
+	appEnv := getenv("APP_ENV", "dev")
+
 	// Resolve DSN with precedence:
 	// 1) DB_HOST + POSTGRES_* (Docker/VM)
 	// 2) DATABASE_URL
 	// 3) default postgres_db
 	dsn, meta := resolvePostgresDSN()
-	log.Printf("Using PostgreSQL DSN (source=%s host=%s db=%s user=%s)", meta.Source, meta.Host, meta.DB, meta.User)
+
+	// Log DSN metadata safely
+	if appEnv != "prod" {
+		log.Printf("Using PostgreSQL DSN (source=%s host=%s db=%s user=%s)", meta.Source, meta.Host, meta.DB, meta.User)
+	} else {
+		log.Printf("Using PostgreSQL DSN (source=%s host=%s db=%s)", meta.Source, meta.Host, meta.DB)
+	}
 
 	// Session key + feature toggles
 	sessionKey := getenv("SESSION_KEY", "")
 	if sessionKey == "" {
 		log.Fatal("SESSION_KEY is required")
 	}
-
-	appEnv := getenv("APP_ENV", "dev")
 	// Note: len(sessionKey) counts bytes, not characters.
 	if appEnv == "prod" && len(sessionKey) < 32 {
 		log.Fatal("SESSION_KEY must be at least 32 bytes (not characters) in prod")
@@ -99,6 +108,11 @@ func main() {
 		}
 	}()
 
+	// Optional connection pool tuning (safe defaults)
+	db.SetConnMaxLifetime(parseDurationEnv("DB_CONN_MAX_LIFETIME", 30*time.Minute))
+	db.SetMaxOpenConns(parseIntEnv("DB_MAX_OPEN_CONNS", 10))
+	db.SetMaxIdleConns(parseIntEnv("DB_MAX_IDLE_CONNS", 10))
+
 	// Test DB connection
 	if err := db.Ping(); err != nil {
 		log.Fatal("Failed to connect to PostgreSQL:", err)
@@ -109,7 +123,6 @@ func main() {
 	if err := migrate.RunMigrations(db); err != nil {
 		log.Fatalf("migration error: %v", err)
 	}
-
 	log.Println("Connected to PostgreSQL and migrations applied successfully!")
 
 	// Templates
@@ -129,6 +142,7 @@ func main() {
 
 	// Router
 	r := mux.NewRouter()
+
 	// Metrics middleware
 	r.Use(metrics.RequestMetricsMiddleware())
 
@@ -137,7 +151,7 @@ func main() {
 	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", fs))
 
 	// Page endpoints
-	r.HandleFunc("/", h.SearchPageHandler).Methods(http.MethodGet)
+	r.HandleFunc("/", h.HomePageHandler).Methods(http.MethodGet)
 	r.HandleFunc("/about", h.AboutPageHandler).Methods(http.MethodGet)
 	r.HandleFunc("/login", h.LoginPageHandler).Methods(http.MethodGet)
 	r.HandleFunc("/register", h.RegisterPageHandler).Methods(http.MethodGet)
@@ -163,9 +177,18 @@ func main() {
 	// Swagger
 	r.PathPrefix("/swagger/").Handler(httpSwagger.WrapHandler)
 
-	// Start server
+	// Start server (with timeouts)
+	srv := &http.Server{
+		Addr:              ":" + port,
+		Handler:           r,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		WriteTimeout:      15 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
+
 	fmt.Printf("Server running on :%s\n", port)
-	log.Fatal(http.ListenAndServe(":"+port, r))
+	log.Fatal(srv.ListenAndServe())
 }
 
 func resolvePostgresDSN() (string, dsnMeta) {
@@ -191,15 +214,18 @@ func buildPostgresDSN(host, source string) (string, dsnMeta) {
 	user := getenv("POSTGRES_USER", "devops")
 	pass := getenv("POSTGRES_PASSWORD", "devops")
 	dbName := getenv("POSTGRES_DB", "whoknows")
+	sslmode := getenv("POSTGRES_SSLMODE", "disable") // keeps your current behavior by default
 
 	dsn := fmt.Sprintf(
-		"postgres://%s:%s@%s:%s/%s?sslmode=disable",
+		"postgres://%s:%s@%s:%s/%s?sslmode=%s",
 		url.QueryEscape(user),
 		url.QueryEscape(pass),
-		url.QueryEscape(host),
+		host, // do NOT escape host
 		port,
 		url.QueryEscape(dbName),
+		url.QueryEscape(sslmode),
 	)
+
 	return dsn, dsnMeta{
 		Source: source,
 		Host:   host,
@@ -232,4 +258,28 @@ func getenv(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+func parseIntEnv(key string, fallback int) int {
+	v := os.Getenv(key)
+	if v == "" {
+		return fallback
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n < 0 {
+		return fallback
+	}
+	return n
+}
+
+func parseDurationEnv(key string, fallback time.Duration) time.Duration {
+	v := os.Getenv(key)
+	if v == "" {
+		return fallback
+	}
+	d, err := time.ParseDuration(v)
+	if err != nil || d <= 0 {
+		return fallback
+	}
+	return d
 }

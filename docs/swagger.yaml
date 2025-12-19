@@ -1,166 +1,173 @@
-swagger: "2.0"
-info:
-  description: "API for the WhoKnows web app: session auth, search content, weather forecast, and health/readiness probes."
-  title: WhoKnows API
-  contact: {}
-  version: 0.1.0
-
-host: ""
 basePath: /
-schemes: []
-
-securityDefinitions:
-  CookieAuth:
-    type: apiKey
-    in: cookie
-    name: session
-    description: Session-based authentication set via /api/login endpoint.
-
-# Global rule: alt kræver session-cookie, medmindre der står security: []
-security:
-  - CookieAuth: []
-
+definitions:
+  handlers.APIErrorResponse:
+    properties:
+      error:
+        type: string
+    type: object
+  handlers.APISearchResponse:
+    properties:
+      search_results:
+        items:
+          $ref: '#/definitions/handlers.SearchResult'
+        type: array
+    type: object
+  handlers.SearchResult:
+    properties:
+      description:
+        type: string
+      id:
+        type: integer
+      language:
+        type: string
+      title:
+        type: string
+      url:
+        type: string
+    type: object
+  handlers.WeatherAPIResponse:
+    properties:
+      forecast:
+        $ref: '#/definitions/handlers.WeatherForecast'
+      location:
+        $ref: '#/definitions/handlers.WeatherLocation'
+    type: object
+  handlers.WeatherForecast:
+    properties:
+      step:
+        type: string
+      temperature:
+        type: number
+      wind_direction:
+        type: number
+      wind_speed:
+        type: number
+    type: object
+  handlers.WeatherLocation:
+    properties:
+      latitude:
+        type: number
+      longitude:
+        type: number
+    type: object
+info:
+  contact: {}
+  description: HTTP API for the WhoKnows application, providing authentication, search, and weather services.
+  title: WhoKnows API
+  version: 0.1.0
 paths:
-  /about:
-    get:
-      security: []  # Public
-      produces:
-        - text/html
-      tags:
-        - Pages
-      summary: Serve About Page
-      responses:
-        "200":
-          description: HTML content
-          schema:
-            type: string
-
   /api/login:
     post:
-      security: []  # Public
-      description: Authenticate a user with username and password. Sets a session cookie and redirects to the home page on success.
       consumes:
-        - application/x-www-form-urlencoded
-      produces:
-        - text/html
-      tags:
-        - API
-      summary: Login
+      - application/x-www-form-urlencoded
+      description: Authenticate a user and start a session.
       parameters:
-        - name: username
-          in: formData
-          description: Username
-          required: true
-          type: string
-        - name: password
-          in: formData
-          description: Password
-          required: true
-          type: string
+      - description: Username
+        in: formData
+        name: username
+        required: true
+        type: string
+      - description: Password
+        in: formData
+        name: password
+        required: true
+        type: string
+      produces:
+      - text/html
       responses:
-        "302":
-          description: Redirect to / after successful login
         "200":
-          description: Login page with validation error
-
+          description: Rendered login form with errors
+          schema:
+            type: string
+        "302":
+          description: Redirect to home page
+          schema:
+            type: string
+      summary: User login
+      tags:
+      - Auth
   /api/logout:
     get:
-      security: []  # Public
-      description: Log out the current user by clearing the session cookie.
+      description: Clear the user session and redirect home.
       produces:
-        - text/html
-      tags:
-        - API
-      summary: Logout
+      - text/html
       responses:
         "302":
-          description: Redirect to / after logout
-    post:
-      security: []  # Public
-      consumes: []  # eksplicit ingen body
-      description: Log out the current user by clearing the session cookie.
-      produces:
-        - text/html
+          description: Redirect to home page
+          schema:
+            type: string
+      security:
+      - sessionAuth: []
+      summary: Logout user
       tags:
-        - API
-      summary: Logout
-      responses:
-        "302":
-          description: Redirect to / after logout
-
+      - Auth
   /api/register:
     post:
-      security: []  # Public
-      description: Register a new user. On success the client is redirected to /login.
       consumes:
-        - application/x-www-form-urlencoded
-      produces:
-        - text/html
-      tags:
-        - API
-      summary: Register
+      - application/x-www-form-urlencoded
+      description: Create a new user account.
       parameters:
-        - name: username
-          in: formData
-          description: Username
-          required: true
-          type: string
-        - name: email
-          in: formData
-          description: Email address
-          required: true
-          type: string
-        - name: password
-          in: formData
-          description: Password
-          required: true
-          type: string
-        - name: password2
-          in: formData
-          description: Password confirmation
-          required: true
-          type: string
+      - description: Username
+        in: formData
+        name: username
+        required: true
+        type: string
+      - description: Email address
+        in: formData
+        name: email
+        required: true
+        type: string
+      - description: Password
+        in: formData
+        name: password
+        required: true
+        type: string
+      - description: Password confirmation
+        in: formData
+        name: password2
+        required: true
+        type: string
+      produces:
+      - text/html
       responses:
-        "302":
-          description: Redirect to /login after successful registration
         "200":
-          description: Registration page with validation errors
-
+          description: Rendered register form with errors
+          schema:
+            type: string
+        "302":
+          description: Redirect to login page
+          schema:
+            type: string
+      summary: Register user
+      tags:
+      - Auth
   /api/search:
     get:
-      # Ingen security-override -> kræver session-cookie
-      description: Search for stored pages and cached Wikipedia content. When the query is empty, an empty result set is returned.
-      produces:
-        - application/json
-      tags:
-        - API
-      summary: Search
+      description: Search stored pages and cached external results.
       parameters:
-        - name: q
-          in: query
-          description: Search query string
-          required: false
-          type: string
-        - name: language
-          in: query
-          description: "Language code (default: en)"
-          required: false
-          type: string
+      - description: Search query
+        in: query
+        name: q
+        type: string
+      - description: Language code (default en)
+        in: query
+        name: language
+        type: string
+      produces:
+      - application/json
       responses:
         "200":
           description: Search results
           schema:
-            $ref: '#/definitions/handlers.SearchResponse'
-
+            $ref: '#/definitions/handlers.APISearchResponse'
+      summary: Search content
+      tags:
+      - Search
   /api/weather:
     get:
-      # Ingen security-override -> kræver session-cookie
       description: Returns the current Copenhagen forecast used by the /weather page.
       produces:
-        - application/json
-      tags:
-        - API
-      summary: Get weather forecast
+      - application/json
       responses:
         "200":
           description: Forecast retrieved
@@ -170,148 +177,46 @@ paths:
           description: Weather service unavailable
           schema:
             $ref: '#/definitions/handlers.APIErrorResponse'
-
+      summary: Get weather forecast
+      tags:
+      - API
   /healthz:
     get:
-      security: []  # Public
+      description: Returns ok when the service is running.
       produces:
-        - text/plain
-      tags:
-        - Health
-      summary: Liveness probe
+      - text/plain
       responses:
         "200":
-          description: Service is healthy
+          description: ok
           schema:
             type: string
-            example: ok
         "500":
-          description: Internal error writing response
-
-  /login:
-    get:
-      security: []  # Public
-      produces:
-        - text/html
-      tags:
-        - Pages
-      summary: Serve Login Page
-      responses:
-        "200":
-          description: HTML content
+          description: internal error
           schema:
             type: string
-
+      summary: Liveness probe
+      tags:
+      - Health
   /readyz:
     get:
-      security: []  # Public
+      description: Checks database connectivity.
       produces:
-        - text/plain
-      tags:
-        - Health
-      summary: Readiness probe
+      - text/plain
       responses:
         "200":
-          description: Database connection is ready
+          description: ready
           schema:
             type: string
-            example: ready
         "503":
-          description: Database not configured or not reachable
+          description: database not ready
           schema:
             type: string
-            example: database not ready
-
-  /register:
-    get:
-      security: []  # Public
-      produces:
-        - text/html
+      summary: Readiness probe
       tags:
-        - Pages
-      summary: Serve Register Page
-      responses:
-        "200":
-          description: HTML content
-          schema:
-            type: string
-
-definitions:
-  handlers.APIErrorResponse:
-    type: object
-    properties:
-      error:
-        type: string
-        example: weather service unavailable
-
-  handlers.SearchResponse:
-    type: object
-    properties:
-      search_results:
-        type: array
-        maxItems: 50
-        items:
-          $ref: '#/definitions/handlers.SearchResult'
-
-  handlers.SearchResult:
-    type: object
-    properties:
-      Description:
-        type: string
-        example: Short description
-      ID:
-        type: integer
-        example: 1
-      Language:
-        type: string
-        example: en
-      Title:
-        type: string
-        example: Example page title
-      URL:
-        type: string
-        example: https://example.com
-
-  handlers.WeatherAPIResponse:
-    type: object
-    properties:
-      forecast:
-        $ref: '#/definitions/handlers.WeatherForecast'
-      location:
-        $ref: '#/definitions/handlers.WeatherLocation'
-
-  handlers.WeatherForecast:
-    type: object
-    properties:
-      step:
-        type: string
-        example: PT1H
-      temperature:
-        type: number
-        example: 12.3
-      wind_direction:
-        type: number
-        example: 225
-      wind_speed:
-        type: number
-        example: 4.5
-
-  handlers.WeatherLocation:
-    type: object
-    properties:
-      latitude:
-        type: number
-        example: 55.715
-      longitude:
-        type: number
-        example: 12.561
-
-  main.AuthResponse:
-    type: object
-    properties:
-      message:
-        type: string
-        example: Login successful
-      statusCode:
-        type: integer
-        example: 200
+      - Health
+securityDefinitions:
+  sessionAuth:
+    in: header
+    name: Cookie
+    type: apiKey
+swagger: "2.0"

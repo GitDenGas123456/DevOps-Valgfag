@@ -1,16 +1,35 @@
 package handlers
 
-import "net/http"
+import (
+	"context"
+	"net/http"
+	"time"
+)
 
+// Healthz godoc
+// @Summary      Liveness probe
+// @Description  Returns ok when the service is running.
+// @Tags         Health
+// @Produce      plain
+// @Success      200  {string}  string  "ok"
+// @Failure      500  {string}  string  "internal error"
+// @Router       /healthz [get]
 func Healthz(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
-	_, err := w.Write([]byte("ok"))
-	if err != nil {
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-	}
+
+	// If the client disconnects while writing, Write may error.
+	_, _ = w.Write([]byte("ok"))
 }
 
+// Readyz godoc
+// @Summary      Readiness probe
+// @Description  Checks database connectivity.
+// @Tags         Health
+// @Produce      plain
+// @Success      200  {string}  string  "ready"
+// @Failure      503  {string}  string  "database not ready"
+// @Router       /readyz [get]
 func Readyz(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 
@@ -19,8 +38,12 @@ func Readyz(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Sonar-venlig: ingen midlertidig err-variabel
-	if db.PingContext(r.Context()) != nil {
+	// Independent short timeout context so readiness isn't tied to client context,
+	// and so it won't hang indefinitely if DB stalls.
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	if err := db.PingContext(ctx); err != nil {
 		http.Error(w, "database not ready", http.StatusServiceUnavailable)
 		return
 	}
