@@ -16,23 +16,24 @@ jobs:
   # -------------------------
   build:
     runs-on: ubuntu-latest
+
+    # Use stable CI defaults for DB (no secrets/vars needed to run tests)
     env:
-      POSTGRES_USER: ${{ secrets.CI_POSTGRES_USER || vars.CI_POSTGRES_USER || 'devops' }}
-      POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD || 'devops' }}
-      POSTGRES_DB: ${{ secrets.CI_POSTGRES_DB || vars.CI_POSTGRES_DB || 'whoknows' }}
+      POSTGRES_USER: devops
+      POSTGRES_PASSWORD: devops
+      POSTGRES_DB: whoknows
 
     services:
       postgres:
         image: postgres:16
         env:
-          # Important: env.* does NOT work here, so we repeat the expressions
-          POSTGRES_USER: ${{ secrets.CI_POSTGRES_USER || vars.CI_POSTGRES_USER || 'devops' }}
-          POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD || 'devops' }}
-          POSTGRES_DB: ${{ secrets.CI_POSTGRES_DB || vars.CI_POSTGRES_DB || 'whoknows' }}
+          POSTGRES_USER: devops
+          POSTGRES_PASSWORD: devops
+          POSTGRES_DB: whoknows
         ports:
           - 5432:5432
         options: >-
-          --health-cmd="pg_isready -U ${{ secrets.CI_POSTGRES_USER || vars.CI_POSTGRES_USER || 'devops' }} -d ${{ secrets.CI_POSTGRES_DB || vars.CI_POSTGRES_DB || 'whoknows' }}"
+          --health-cmd="pg_isready -U devops -d whoknows"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
@@ -108,22 +109,23 @@ jobs:
   healthz:
     runs-on: ubuntu-latest
     needs: build
+
     env:
-      POSTGRES_USER: ${{ secrets.CI_POSTGRES_USER || vars.CI_POSTGRES_USER || 'devops' }}
-      POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD || 'devops' }}
-      POSTGRES_DB: ${{ secrets.CI_POSTGRES_DB || vars.CI_POSTGRES_DB || 'whoknows' }}
+      POSTGRES_USER: devops
+      POSTGRES_PASSWORD: devops
+      POSTGRES_DB: whoknows
 
     services:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_USER: ${{ secrets.CI_POSTGRES_USER || vars.CI_POSTGRES_USER || 'devops' }}
-          POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD || 'devops' }}
-          POSTGRES_DB: ${{ secrets.CI_POSTGRES_DB || vars.CI_POSTGRES_DB || 'whoknows' }}
+          POSTGRES_USER: devops
+          POSTGRES_PASSWORD: devops
+          POSTGRES_DB: whoknows
         ports:
           - 5432:5432
         options: >-
-          --health-cmd="pg_isready -U ${{ secrets.CI_POSTGRES_USER || vars.CI_POSTGRES_USER || 'devops' }} -d ${{ secrets.CI_POSTGRES_DB || vars.CI_POSTGRES_DB || 'whoknows' }}"
+          --health-cmd="pg_isready -U devops -d whoknows"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
@@ -228,11 +230,10 @@ jobs:
           GF_SECURITY_ADMIN_USER: ${{ secrets.GF_SECURITY_ADMIN_USER }}
           GF_SECURITY_ADMIN_PASSWORD: ${{ secrets.GF_SECURITY_ADMIN_PASSWORD }}
 
-          # If docker-compose.yml uses ${VAR:?} guards, these must exist.
-          APP_IMAGE_TAG: ${{ vars.APP_IMAGE_TAG || 'latest' }}
-          NODE_EXPORTER_IMAGE: ${{ vars.NODE_EXPORTER_IMAGE || 'prom/node-exporter:latest' }}
-          PROMETHEUS_IMAGE: ${{ vars.PROMETHEUS_IMAGE || 'prom/prometheus:latest' }}
-          GRAFANA_IMAGE: ${{ vars.GRAFANA_IMAGE || 'grafana/grafana:latest' }}
+          APP_IMAGE_TAG: ${{ vars.APP_IMAGE_TAG }}
+          NODE_EXPORTER_IMAGE: ${{ vars.NODE_EXPORTER_IMAGE }}
+          PROMETHEUS_IMAGE: ${{ vars.PROMETHEUS_IMAGE }}
+          GRAFANA_IMAGE: ${{ vars.GRAFANA_IMAGE }}
         with:
           host: ${{ vars.PROD_SSH_HOST }}
           username: ${{ vars.PROD_SSH_USER }}
