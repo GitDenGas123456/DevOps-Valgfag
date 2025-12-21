@@ -34,7 +34,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "bf5kriou02oe8d"
+            "uid": "prometheus"
           },
           "fieldConfig": {
             "defaults": {
@@ -99,7 +99,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "bf5kriou02oe8d"
+            "uid": "prometheus"
           },
           "fieldConfig": {
             "defaults": {
@@ -181,7 +181,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "sum by (path) (\r\n  rate(app_http_requests_total{\r\n    path!~\"/metrics|/static/.*|/favicon.ico\"\r\n  }[5m])\r\n)\r\n",
+              "expr": "sum by (path) (\r\n  rate(app_http_requests_total{\r\n    job=\"whoknows-app\",\r\n    path!~\"/metrics|/static/.*|/favicon.ico\"\r\n  }[5m])\r\n)\r\n",
               "legendFormat": "__auto",
               "range": true,
               "refId": "A"
@@ -193,7 +193,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "bf5kriou02oe8d"
+            "uid": "prometheus"
           },
           "fieldConfig": {
             "defaults": {
@@ -258,7 +258,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "bf5kriou02oe8d"
+            "uid": "prometheus"
           },
           "fieldConfig": {
             "defaults": {
@@ -319,7 +319,7 @@
               {
                 "matcher": {
                   "id": "byName",
-                  "options": "{instance=\"host.docker.internal:8080\", job=\"go_app\"}"
+                  "options": "{job=\"whoknows-app\"}"
                 },
                 "properties": [
                   {
@@ -354,7 +354,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "rate(go_gc_duration_seconds_sum{job=\"go_app\"}[5m]) * 1000\r\n",
+              "expr": "rate(go_gc_duration_seconds_sum{job=\"whoknows-app\"}[5m]) * 1000\r\n",
               "legendFormat": "__auto",
               "range": true,
               "refId": "A"
@@ -366,7 +366,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "bf5kriou02oe8d"
+            "uid": "prometheus"
           },
           "fieldConfig": {
             "defaults": {
@@ -431,7 +431,7 @@
               {
                 "matcher": {
                   "id": "byName",
-                  "options": "sum(rate(app_http_requests_total{code!~\"2..\"}[5m]))\r\n"
+                  "options": "sum(rate(app_http_requests_total{job=\"whoknows-app\", code!~\"2..\"}[5m]))\r\n"
                 },
                 "properties": [
                   {
@@ -466,7 +466,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "sum(rate(app_http_requests_total{code!~\"2..\"}[5m]))\r\n",
+              "expr": "sum(rate(app_http_requests_total{job=\"whoknows-app\", code!~\"2..\"}[5m]))\r\n",
               "legendFormat": "__auto",
               "range": true,
               "refId": "A"
@@ -478,7 +478,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "bf5kriou02oe8d"
+            "uid": "prometheus"
           },
           "fieldConfig": {
             "defaults": {
@@ -538,7 +538,7 @@
               {
                 "matcher": {
                   "id": "byName",
-                  "options": "{__name__=\"go_goroutines\", instance=\"host.docker.internal:8080\", job=\"go_app\"}"
+                  "options": "{__name__=\"go_goroutines\", job=\"whoknows-app\"}"
                 },
                 "properties": [
                   {
@@ -573,7 +573,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "go_goroutines{job=\"go_app\"}\r\n",
+              "expr": "go_goroutines{job=\"whoknows-app\"}\r\n",
               "legendFormat": "__auto",
               "range": true,
               "refId": "A"
@@ -599,7 +599,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "bf5kriou02oe8d"
+            "uid": "prometheus"
           },
           "fieldConfig": {
             "defaults": {
@@ -631,7 +631,7 @@
               {
                 "matcher": {
                   "id": "byName",
-                  "options": "histogram_quantile(\r\n  0.50,\r\n  sum(rate(app_search_duration_seconds_bucket[5m])) by (le)\r\n) * 1000\r\n"
+                  "options": "histogram_quantile(\r\n  0.50,\r\n  sum(rate(app_search_duration_seconds_bucket{job=\"whoknows-app\"}[5m])) by (le)\r\n) * 1000\r\n"
                 },
                 "properties": [
                   {
@@ -643,7 +643,7 @@
               {
                 "matcher": {
                   "id": "byName",
-                  "options": "histogram_quantile(\r\n  0.95,\r\n  sum(rate(app_search_duration_seconds_bucket[5m])) by (le)\r\n) * 1000\r\n"
+                  "options": "histogram_quantile(\r\n  0.95,\r\n  sum(rate(app_search_duration_seconds_bucket{job=\"whoknows-app\"}[5m])) by (le)\r\n) * 1000\r\n"
                 },
                 "properties": [
                   {
@@ -682,7 +682,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "histogram_quantile(\r\n  0.50,\r\n  sum(rate(app_search_duration_seconds_bucket[5m])) by (le)\r\n) * 1000\r\n",
+              "expr": "histogram_quantile(\r\n  0.50,\r\n  sum(rate(app_search_duration_seconds_bucket{job=\"whoknows-app\"}[5m])) by (le)\r\n) * 1000\r\n",
               "legendFormat": "__auto",
               "range": true,
               "refId": "A"
@@ -690,10 +690,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "bf5kriou02oe8d"
+                "uid": "prometheus"
               },
               "editorMode": "code",
-              "expr": "histogram_quantile(\r\n  0.95,\r\n  sum(rate(app_search_duration_seconds_bucket[5m])) by (le)\r\n) * 1000\r\n",
+              "expr": "histogram_quantile(\r\n  0.95,\r\n  sum(rate(app_search_duration_seconds_bucket{job=\"whoknows-app\"}[5m])) by (le)\r\n) * 1000\r\n",
               "hide": false,
               "instant": false,
               "legendFormat": "__auto",
@@ -707,7 +707,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "bf5kriou02oe8d"
+            "uid": "prometheus"
           },
           "fieldConfig": {
             "defaults": {
@@ -768,7 +768,7 @@
               {
                 "matcher": {
                   "id": "byName",
-                  "options": "sum(rate(app_http_requests_total[5m]))\r\n"
+                  "options": "sum(rate(app_http_requests_total{job=\"whoknows-app\"}[5m]))\r\n"
                 },
                 "properties": [
                   {
@@ -803,7 +803,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "sum(rate(app_http_requests_total[5m]))\r\n",
+              "expr": "sum(rate(app_http_requests_total{job=\"whoknows-app\"}[5m]))\r\n",
               "legendFormat": "__auto",
               "range": true,
               "refId": "A"
@@ -815,7 +815,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "bf5kriou02oe8d"
+            "uid": "prometheus"
           },
           "fieldConfig": {
             "defaults": {
@@ -873,7 +873,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "histogram_quantile(\r\n  0.95,\r\n  sum(rate(app_search_duration_seconds_bucket[5m])) by (le)\r\n) * 1000\r\n",
+              "expr": "histogram_quantile(\r\n  0.95,\r\n  sum(rate(app_search_duration_seconds_bucket{job=\"whoknows-app\"}[5m])) by (le)\r\n) * 1000\r\n",
               "legendFormat": "__auto",
               "range": true,
               "refId": "A"
@@ -899,7 +899,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "bf5kriou02oe8d"
+            "uid": "prometheus"
           },
           "fieldConfig": {
             "defaults": {
@@ -1019,7 +1019,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "sum by (path) (\r\n  rate(app_http_requests_total{\r\n    path=~\"/|/login|/api/login\"\r\n  }[5m])\r\n)\r\n",
+              "expr": "sum by (path) (\r\n  rate(app_http_requests_total{\r\n    job=\"whoknows-app\",\r\n    path=~\"^/$|^/search$|^/login$|^/api/login$\"\r\n  }[5m])\r\n)\r\n",
               "legendFormat": "__auto",
               "range": true,
               "refId": "A"
@@ -1031,7 +1031,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "bf5kriou02oe8d"
+            "uid": "prometheus"
           },
           "fieldConfig": {
             "defaults": {
@@ -1092,7 +1092,7 @@
               {
                 "matcher": {
                   "id": "byName",
-                  "options": "{instance=\"host.docker.internal:8080\", job=\"go_app\"}"
+                  "options": "{job=\"whoknows-app\"}"
                 },
                 "properties": [
                   {
@@ -1127,7 +1127,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "rate(app_search_total[5m])\r\n",
+              "expr": "rate(app_search_total{job=\"whoknows-app\"}[5m])\r\n",
               "legendFormat": "__auto",
               "range": true,
               "refId": "A"
@@ -1139,7 +1139,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "bf5kriou02oe8d"
+            "uid": "prometheus"
           },
           "fieldConfig": {
             "defaults": {
@@ -1202,7 +1202,7 @@
               {
                 "matcher": {
                   "id": "byName",
-                  "options": "{instance=\"host.docker.internal:8080\", job=\"go_app\"}"
+                  "options": "{job=\"whoknows-app\"}"
                 },
                 "properties": [
                   {
@@ -1237,7 +1237,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "100 * rate(app_search_with_result_total[5m]) / rate(app_search_total[5m])\r\n",
+              "expr": "100 * rate(app_search_with_result_total{job=\"whoknows-app\"}[5m]) / rate(app_search_total{job=\"whoknows-app\"}[5m])\r\n",
               "legendFormat": "__auto",
               "range": true,
               "refId": "A"
@@ -1264,6 +1264,6 @@
   "timepicker": {},
   "timezone": "browser",
   "title": "Health",
-  "uid": "adkchb7",
+  "uid": "whoknows-health",
   "version": 36
 }

@@ -15,38 +15,19 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/about": {
-            "get": {
-                "produces": [
-                    "text/html"
-                ],
-                "tags": [
-                    "Pages"
-                ],
-                "summary": "Serve About Page",
-                "responses": {
-                    "200": {
-                        "description": "HTML content",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                }
-            }
-        },
         "/api/login": {
             "post": {
-                "description": "Authenticate a user with username and password",
+                "description": "Authenticate a user and start a session.",
                 "consumes": [
                     "application/x-www-form-urlencoded"
                 ],
                 "produces": [
-                    "application/json"
+                    "text/html"
                 ],
                 "tags": [
-                    "API"
+                    "Auth"
                 ],
-                "summary": "Login",
+                "summary": "User login",
                 "parameters": [
                     {
                         "type": "string",
@@ -65,15 +46,15 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Rendered login form with errors",
                         "schema": {
-                            "$ref": "#/definitions/main.AuthResponse"
+                            "type": "string"
                         }
                     },
-                    "400": {
-                        "description": "Bad Request",
+                    "302": {
+                        "description": "Redirect to home page",
                         "schema": {
-                            "$ref": "#/definitions/main.AuthResponse"
+                            "type": "string"
                         }
                     }
                 }
@@ -81,19 +62,24 @@ const docTemplate = `{
         },
         "/api/logout": {
             "get": {
-                "description": "Log out the current user",
+                "security": [
+                    {
+                        "sessionAuth": []
+                    }
+                ],
+                "description": "Clear the user session and redirect home.",
                 "produces": [
-                    "application/json"
+                    "text/html"
                 ],
                 "tags": [
-                    "API"
+                    "Auth"
                 ],
-                "summary": "Logout",
+                "summary": "Logout user",
                 "responses": {
-                    "200": {
-                        "description": "OK",
+                    "302": {
+                        "description": "Redirect to home page",
                         "schema": {
-                            "$ref": "#/definitions/main.AuthResponse"
+                            "type": "string"
                         }
                     }
                 }
@@ -101,17 +87,17 @@ const docTemplate = `{
         },
         "/api/register": {
             "post": {
-                "description": "Register a new user",
+                "description": "Create a new user account.",
                 "consumes": [
                     "application/x-www-form-urlencoded"
                 ],
                 "produces": [
-                    "application/json"
+                    "text/html"
                 ],
                 "tags": [
-                    "API"
+                    "Auth"
                 ],
-                "summary": "Register",
+                "summary": "Register user",
                 "parameters": [
                     {
                         "type": "string",
@@ -122,7 +108,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Email",
+                        "description": "Email address",
                         "name": "email",
                         "in": "formData",
                         "required": true
@@ -136,77 +122,21 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Password Confirmation",
+                        "description": "Password confirmation",
                         "name": "password2",
-                        "in": "formData"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/main.AuthResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/main.AuthResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/search": {
-            "post": {
-                "description": "Search for content by query and language",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "API"
-                ],
-                "summary": "Search",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Search query",
-                        "name": "q",
-                        "in": "query",
+                        "in": "formData",
                         "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Language code (e.g., 'en')",
-                        "name": "language",
-                        "in": "query"
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Rendered register form with errors",
                         "schema": {
-                            "$ref": "#/definitions/main.SearchResponse"
+                            "type": "string"
                         }
-                    }
-                }
-            }
-        },
-        "/login": {
-            "get": {
-                "produces": [
-                    "text/html"
-                ],
-                "tags": [
-                    "Pages"
-                ],
-                "summary": "Serve Login Page",
-                "responses": {
-                    "200": {
-                        "description": "HTML content",
+                    },
+                    "302": {
+                        "description": "Redirect to login page",
                         "schema": {
                             "type": "string"
                         }
@@ -214,18 +144,111 @@ const docTemplate = `{
                 }
             }
         },
-        "/register": {
+        "/api/search": {
             "get": {
+                "description": "Search stored pages and cached external results.",
                 "produces": [
-                    "text/html"
+                    "application/json"
                 ],
                 "tags": [
-                    "Pages"
+                    "Search"
                 ],
-                "summary": "Serve Register Page",
+                "summary": "Search content",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Search query",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Language code (default en)",
+                        "name": "language",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
-                        "description": "HTML content",
+                        "description": "Search results",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.APISearchResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/weather": {
+            "get": {
+                "description": "Returns the current Copenhagen forecast used by the /weather page.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "API"
+                ],
+                "summary": "Get weather forecast",
+                "responses": {
+                    "200": {
+                        "description": "Forecast retrieved",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.WeatherAPIResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Weather service unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.APIErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/healthz": {
+            "get": {
+                "description": "Returns ok when the service is running.",
+                "produces": [
+                    "text/plain"
+                ],
+                "tags": [
+                    "Health"
+                ],
+                "summary": "Liveness probe",
+                "responses": {
+                    "200": {
+                        "description": "ok",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "internal error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/readyz": {
+            "get": {
+                "description": "Checks database connectivity.",
+                "produces": [
+                    "text/plain"
+                ],
+                "tags": [
+                    "Health"
+                ],
+                "summary": "Readiness probe",
+                "responses": {
+                    "200": {
+                        "description": "ready",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "503": {
+                        "description": "database not ready",
                         "schema": {
                             "type": "string"
                         }
@@ -235,46 +258,90 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "main.AuthResponse": {
+        "handlers.APIErrorResponse": {
             "type": "object",
             "properties": {
-                "message": {
-                    "type": "string",
-                    "example": "Login successful"
-                },
-                "statusCode": {
-                    "type": "integer",
-                    "example": 200
+                "error": {
+                    "type": "string"
                 }
             }
         },
-        "main.SearchResponse": {
+        "handlers.APISearchResponse": {
             "type": "object",
             "properties": {
                 "search_results": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/main.SearchResult"
+                        "$ref": "#/definitions/handlers.SearchResult"
                     }
                 }
             }
         },
-        "main.SearchResult": {
+        "handlers.SearchResult": {
             "type": "object",
             "properties": {
-                "content": {
-                    "type": "string",
-                    "example": "Sample content"
+                "description": {
+                    "type": "string"
                 },
                 "id": {
-                    "type": "integer",
-                    "example": 1
+                    "type": "integer"
                 },
                 "language": {
-                    "type": "string",
-                    "example": "en"
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "url": {
+                    "type": "string"
                 }
             }
+        },
+        "handlers.WeatherAPIResponse": {
+            "type": "object",
+            "properties": {
+                "forecast": {
+                    "$ref": "#/definitions/handlers.WeatherForecast"
+                },
+                "location": {
+                    "$ref": "#/definitions/handlers.WeatherLocation"
+                }
+            }
+        },
+        "handlers.WeatherForecast": {
+            "type": "object",
+            "properties": {
+                "step": {
+                    "type": "string"
+                },
+                "temperature": {
+                    "type": "number"
+                },
+                "wind_direction": {
+                    "type": "number"
+                },
+                "wind_speed": {
+                    "type": "number"
+                }
+            }
+        },
+        "handlers.WeatherLocation": {
+            "type": "object",
+            "properties": {
+                "latitude": {
+                    "type": "number"
+                },
+                "longitude": {
+                    "type": "number"
+                }
+            }
+        }
+    },
+    "securityDefinitions": {
+        "sessionAuth": {
+            "type": "apiKey",
+            "name": "Cookie",
+            "in": "header"
         }
     }
 }`

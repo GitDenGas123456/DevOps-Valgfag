@@ -1,56 +1,66 @@
 basePath: /
 definitions:
-  main.AuthResponse:
+  handlers.APIErrorResponse:
     properties:
-      message:
-        example: Login successful
+      error:
         type: string
-      statusCode:
-        example: 200
-        type: integer
     type: object
-  main.SearchResponse:
+  handlers.APISearchResponse:
     properties:
       search_results:
         items:
-          $ref: '#/definitions/main.SearchResult'
+          $ref: '#/definitions/handlers.SearchResult'
         type: array
     type: object
-  main.SearchResult:
+  handlers.SearchResult:
     properties:
-      content:
-        example: Sample content
+      description:
         type: string
       id:
-        example: 1
         type: integer
       language:
-        example: en
         type: string
+      title:
+        type: string
+      url:
+        type: string
+    type: object
+  handlers.WeatherAPIResponse:
+    properties:
+      forecast:
+        $ref: '#/definitions/handlers.WeatherForecast'
+      location:
+        $ref: '#/definitions/handlers.WeatherLocation'
+    type: object
+  handlers.WeatherForecast:
+    properties:
+      step:
+        type: string
+      temperature:
+        type: number
+      wind_direction:
+        type: number
+      wind_speed:
+        type: number
+    type: object
+  handlers.WeatherLocation:
+    properties:
+      latitude:
+        type: number
+      longitude:
+        type: number
     type: object
 info:
   contact: {}
-  description: Application user with login credentials
+  description: HTTP API for the WhoKnows application, providing authentication, search, and weather services.
   title: WhoKnows API
   version: 0.1.0
 paths:
-  /about:
-    get:
-      produces:
-      - text/html
-      responses:
-        "200":
-          description: HTML content
-          schema:
-            type: string
-      summary: Serve About Page
-      tags:
-      - Pages
   /api/login:
     post:
       consumes:
       - application/x-www-form-urlencoded
-      description: Authenticate a user with username and password
+      description: Authenticate a user and start a session.
       parameters:
       - description: Username
         in: formData
@@ -63,44 +73,46 @@ paths:
         required: true
         type: string
       produces:
-      - application/json
+      - text/html
       responses:
         "200":
-          description: OK
+          description: Rendered login form with errors
           schema:
-            $ref: '#/definitions/main.AuthResponse'
-        "400":
-          description: Bad Request
+            type: string
+        "302":
+          description: Redirect to home page
           schema:
-            $ref: '#/definitions/main.AuthResponse'
-      summary: Login
+            type: string
+      summary: User login
       tags:
-      - API
+      - Auth
   /api/logout:
     get:
-      description: Log out the current user
+      description: Clear the user session and redirect home.
       produces:
-      - application/json
+      - text/html
       responses:
-        "200":
-          description: OK
+        "302":
+          description: Redirect to home page
           schema:
-            $ref: '#/definitions/main.AuthResponse'
-      summary: Logout
+            type: string
+      security:
+      - sessionAuth: []
+      summary: Logout user
       tags:
-      - API
+      - Auth
   /api/register:
     post:
       consumes:
       - application/x-www-form-urlencoded
-      description: Register a new user
+      description: Create a new user account.
       parameters:
       - description: Username
         in: formData
         name: username
         required: true
         type: string
-      - description: Email
+      - description: Email address
         in: formData
         name: email
         required: true
@@ -110,36 +122,34 @@ paths:
         name: password
         required: true
         type: string
-      - description: Password Confirmation
+      - description: Password confirmation
         in: formData
         name: password2
+        required: true
         type: string
       produces:
-      - application/json
+      - text/html
       responses:
         "200":
-          description: OK
+          description: Rendered register form with errors
           schema:
-            $ref: '#/definitions/main.AuthResponse'
-        "400":
-          description: Bad Request
+            type: string
+        "302":
+          description: Redirect to login page
           schema:
-            $ref: '#/definitions/main.AuthResponse'
-      summary: Register
+            type: string
+      summary: Register user
       tags:
-      - API
+      - Auth
   /api/search:
-    post:
-      consumes:
-      - application/json
-      description: Search for content by query and language
+    get:
+      description: Search stored pages and cached external results.
       parameters:
       - description: Search query
         in: query
         name: q
-        required: true
         type: string
-      - description: Language code (e.g., 'en')
+      - description: Language code (default en)
         in: query
         name: language
         type: string
@@ -147,34 +157,66 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Search results
           schema:
-            $ref: '#/definitions/main.SearchResponse'
-      summary: Search
+            $ref: '#/definitions/handlers.APISearchResponse'
+      summary: Search content
+      tags:
+      - Search
+  /api/weather:
+    get:
+      description: Returns the current Copenhagen forecast used by the /weather page.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Forecast retrieved
+          schema:
+            $ref: '#/definitions/handlers.WeatherAPIResponse'
+        "503":
+          description: Weather service unavailable
+          schema:
+            $ref: '#/definitions/handlers.APIErrorResponse'
+      summary: Get weather forecast
       tags:
       - API
-  /login:
+  /healthz:
     get:
+      description: Returns ok when the service is running.
       produces:
-      - text/html
+      - text/plain
       responses:
         "200":
-          description: HTML content
+          description: ok
           schema:
             type: string
-      summary: Serve Login Page
+        "500":
+          description: internal error
+          schema:
+            type: string
+      summary: Liveness probe
       tags:
-      - Pages
-  /register:
+      - Health
+  /readyz:
     get:
+      description: Checks database connectivity.
       produces:
-      - text/html
+      - text/plain
       responses:
         "200":
-          description: HTML content
+          description: ready
           schema:
             type: string
-      summary: Serve Register Page
+        "503":
+          description: database not ready
+          schema:
+            type: string
+      summary: Readiness probe
       tags:
-      - Pages
+      - Health
+securityDefinitions:
+  sessionAuth:
+    in: header
+    name: Cookie
+    type: apiKey
 swagger: "2.0"

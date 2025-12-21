@@ -22,8 +22,6 @@ Thumbs.db
 *.swp
 
 # Docker-specific
-Dockerfile
-
-
-# Database (optional — comment this out if you want to copy it into the image)
-#internal/db/whoknows.db
+# Dockerfile
+.env
+.env.*

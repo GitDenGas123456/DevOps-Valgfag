@@ -1,6 +1,8 @@
-PHONY: check fmt vet lint test build smoke docker
+.PHONY: check fmt vet lint test build smoke docker verify-metrics grafana-ds-uid
+
 PORT ?= 8080
-LOG   ?= /tmp/whoknows.log
+LOG  ?= /tmp/whoknows.log
+GRAFANA_HOST ?= http://localhost:3000
 
 check: fmt vet lint test build smoke docker
 
@@ -12,55 +14,59 @@ vet:
 
 lint:
 	@if command -v golangci-lint >/dev/null 2>&1; then \
-	  golangci-lint run ./...; \
+		golangci-lint run ./... ; \
 	else \
-	  echo "golangci-lint not found - skipping (install: https://golangci-lint.run/)"; \
+		echo "golangci-lint missing - skipping"; \
 	fi
+
+# Lokal test (CI kører race+coverage selv)
 test:
-	go test -race -cover ./...
+	go test -race ./...
 
 build:
-	go build ./cmd/server
+	go build -o server ./cmd/server
 
-smoke:
-	@SEED_ON_BOOT=0 PORT=$(PORT) go run ./cmd/server > $(LOG) 2>&1 & echo $$! > .app.pid; \
+smoke: build
+	@set -e; \
+	./server >"$(LOG)" 2>&1 & echo $$! > .app.pid; \
 	sleep 1; \
 	URL="http://127.0.0.1:$(PORT)/healthz" scripts/smoke.sh; \
 	kill `cat .app.pid` >/dev/null 2>&1 || true; rm -f .app.pid
 
+verify-metrics:
+	@set -e; \
+	echo "Checking server is up on /healthz (PORT=$(PORT))..."; \
+	curl -fsS --max-time 2 "http://127.0.0.1:$(PORT)/healthz" >/dev/null || { \
+		echo "FAIL: server not responding on http://127.0.0.1:$(PORT)"; \
+		echo "Start it first (e.g. make build && ./server)"; \
+		exit 1; \
+	}; \
+	echo "Curl /search and / to populate metrics..."; \
+	curl -fsS --max-time 5 "http://127.0.0.1:$(PORT)/search?q=abc" >/dev/null; \
+	curl -fsS --max-time 5 "http://127.0.0.1:$(PORT)/?q=abc" >/dev/null; \
+	echo "Expect both path=\"/search\" and path=\"/\" in app_http_requests_total:"; \
+	metrics="$$(curl -fsS --max-time 5 "http://127.0.0.1:$(PORT)/metrics" | grep 'app_http_requests_total' || true)"; \
+	echo "$$metrics" | grep -q 'path=\"/search\"' && echo "OK: /search present" || { echo "FAIL: /search missing"; exit 1; }; \
+	echo "$$metrics" | grep -q 'path=\"/\"'      && echo "OK: / present"      || { echo "FAIL: / missing"; exit 1; }
+
 docker:
 	@if [ -f Dockerfile ]; then \
-	  if command -v hadolint >/dev/null 2>&1; then hadolint Dockerfile; else echo "hadolint missing — skipping"; fi; \
-	  docker build -t whoknows-app:local . ; \
+		if command -v hadolint >/dev/null 2>&1; then hadolint Dockerfile; else echo "hadolint missing - skipping"; fi; \
+		docker build -t whoknows-app:local . ; \
 	fi
 
-
-DB ?= $(DATABASE_PATH)
-DB := $(if $(DB),$(DB),data/seed/whoknows.db)
-
-.PHONY: migrate.init migrate migrate.check
-
-migrate.init:
-	@mkdir -p migrations
-	@command -v sqlite3 >/dev/null 2>&1 || { echo "sqlite3 not installed – skipping"; exit 0; }
-	@sqlite3 "$(DB)" "CREATE TABLE IF NOT EXISTS schema_migrations (version TEXT PRIMARY KEY);"
-	@echo "Init done → $(DB)"
-
-migrate: migrate.init
-	@command -v sqlite3 >/dev/null 2>&1 || { echo "sqlite3 not installed – skipping"; exit 0; }
-	@for f in $$(ls -1 migrations/*.sql 2>/dev/null | sort); do \
-	  ver=$$(basename $$f .sql); \
-	  applied=$$(sqlite3 "$(DB)" "SELECT 1 FROM schema_migrations WHERE version='$$ver' LIMIT 1;"); \
-	  if [ "$$applied" != "1" ]; then \
-	    echo "Applying $$ver ..."; \
-	    sqlite3 "$(DB)" < "$$f" && sqlite3 "$(DB)" "INSERT INTO schema_migrations(version) VALUES('$$ver');" || { echo "❌ $$ver failed"; exit 1; }; \
-	  fi; \
-	done; echo "✅ All migrations applied"
-
-migrate.check: migrate.init
-	@command -v sqlite3 >/dev/null 2>&1 || { echo "sqlite3 not installed – can't verify"; exit 0; }
-	@pending=0; for f in $$(ls -1 migrations/*.sql 2>/dev/null | sort); do \
-	  ver=$$(basename $$f .sql); \
-	  applied=$$(sqlite3 "$(DB)" "SELECT 1 FROM schema_migrations WHERE version='$$ver' LIMIT 1;"); \
-	  if [ "$$applied" != "1" ]; then echo "Pending: $$ver"; pending=1; fi; \
-	done; test $$pending -eq 0 && echo "✅ No pending migrations" || (echo "❌ Pending migrations"; exit 1)
+grafana-ds-uid:
+	@command -v curl >/dev/null 2>&1 || { echo "curl not installed"; exit 1; }
+	@command -v jq   >/dev/null 2>&1 || { echo "jq not installed"; exit 1; }
+	@set -e; \
+	token="$(GRAFANA_API_TOKEN)"; \
+	if [ -z "$$token" ] && [ -f .env ]; then \
+		token=$$(grep -E '^GRAFANA_API_TOKEN=' .env | tail -1 | cut -d= -f2- | tr -d '\r'); \
+	fi; \
+	if [ -z "$$token" ]; then \
+		echo "Set GRAFANA_API_TOKEN (env or .env) before running"; \
+		exit 1; \
+	fi; \
+	echo "Grafana API: $(GRAFANA_HOST)/api/datasources"; \
+	curl -fsS --max-time 10 -H "Authorization: Bearer $$token" "$(GRAFANA_HOST)/api/datasources" | \
+		jq -r '.[].name + " => " + .uid'

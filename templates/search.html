@@ -1,4 +1,4 @@
-﻿{{define "search"}}
+{{define "search"}}
   {{template "header" .}}
 
   <!-- Full-bleed hero with blue sky + clouds -->
@@ -10,10 +10,10 @@
 
     <div class="hero-slab container">
       <h1 class="hero-title">Search the web</h1>
-      <div class="search-pill">
-        <input id="search-input" class="pill-input" placeholder="Search anything…" value="{{ .Query }}">
-        <button id="search-button" class="pill-button" onclick="makeSearchRequest()">Search</button>
-      </div>
+      <form id="search-form" class="search-pill" method="GET" action="/search">
+        <input id="search-input" name="q" class="pill-input" placeholder="Search anything." value="{{ .Query }}">
+        <button id="search-button" class="pill-button" type="submit">Search</button>
+      </form>
     </div>
   </section>
 
