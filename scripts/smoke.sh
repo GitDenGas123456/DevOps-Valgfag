@@ -20,7 +20,7 @@ check "/healthz" "ok"
 echo "Health check passed ✅"
 
 # Readiness: DB reachable (may fail if DB not ready yet, hence retry)
-check "/readyz" "ok"
+check "/readyz" "ready"
 echo "Readiness check passed ✅"
 
 # Metrics endpoint exists (Prometheus scrape target)
