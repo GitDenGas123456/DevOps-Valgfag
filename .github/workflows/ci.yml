@@ -206,7 +206,7 @@ jobs:
 
       - name: Wait for /readyz
         run: |
-          for i in $(seq 1 60); do
+          for _ in $(seq 1 60); do
             if curl -fsS http://127.0.0.1:8080/readyz | grep -qx 'ready'; then
               exit 0
             fi
@@ -293,7 +293,17 @@ jobs:
             GF_SECURITY_ADMIN_USER,GF_SECURITY_ADMIN_PASSWORD,
             APP_IMAGE_TAG
           script: |
-            set -e
+            set -euo pipefail
+
+            : "${DEPLOY_PATH:?Missing DEPLOY_PATH (vars)}"
+            : "${POSTGRES_USER:?Missing POSTGRES_USER (vars)}"
+            : "${POSTGRES_DB:?Missing POSTGRES_DB (vars)}"
+            : "${POSTGRES_PASSWORD:?Missing POSTGRES_PASSWORD (secret)}"
+            : "${SESSION_KEY:?Missing SESSION_KEY (secret)}"
+            : "${DMI_API_KEY:?Missing DMI_API_KEY (secret)}"
+            : "${GF_SECURITY_ADMIN_USER:?Missing GF_SECURITY_ADMIN_USER (secret)}"
+            : "${GF_SECURITY_ADMIN_PASSWORD:?Missing GF_SECURITY_ADMIN_PASSWORD (secret)}"
+
             cd "${DEPLOY_PATH}"
             git fetch origin main
             git reset --hard origin/main
