@@ -54,15 +54,11 @@ jobs:
       - run: go mod download
       - run: go vet ./...
 
-      # IMPORTANT:
-      # golangci-lint binary is currently built with Go 1.24, while repo targets Go 1.25.
-      # Force golangci-lint to target Go 1.24 until a golangci-lint build with Go >= 1.25 exists.
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v8
         with:
           version: v2.1.6
-          args: --go=1.24 --timeout=5m ./...
-
+          args: --timeout=5m ./...
       - name: Run tests
         env:
           DATABASE_URL: postgres://devops:devops@localhost:5432/whoknows?sslmode=disable
