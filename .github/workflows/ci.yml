@@ -207,6 +207,7 @@ jobs:
           username: ${{ vars.PROD_SSH_USER }}
           key: ${{ secrets.PROD_SSH_KEY }}
           port: ${{ vars.PROD_SSH_PORT || '22' }}
+          envs: POSTGRES_USER,POSTGRES_DB,POSTGRES_PASSWORD,SESSION_KEY,DMI_API_KEY,GF_SECURITY_ADMIN_USER,GF_SECURITY_ADMIN_PASSWORD,APP_IMAGE_TAG,NODE_EXPORTER_IMAGE,PROMETHEUS_IMAGE,GRAFANA_IMAGE
           script: |
             set -euo pipefail
 
