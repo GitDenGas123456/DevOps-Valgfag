@@ -12,12 +12,13 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o app ./cmd/server
 
-
 ############################
 # Runtime stage
 ############################
 FROM alpine:3.20
 WORKDIR /app
+
+RUN apk add --no-cache ca-certificates curl
 
 COPY --from=build /app/app .
 
@@ -30,7 +31,6 @@ COPY --from=build /app/scripts ./scripts
 
 ENV PORT=8080
 
-# DATABASE_URL must be provided via docker-compose or k8s
 EXPOSE 8080
 
 ENTRYPOINT ["./app"]
