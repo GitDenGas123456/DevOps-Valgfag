@@ -27,8 +27,6 @@ jobs:
           POSTGRES_DB: ${{ secrets.CI_POSTGRES_DB || vars.CI_POSTGRES_DB || 'whoknows' }}
         ports:
           - 5432:5432
-        # IMPORTANT: ingen secrets/vars i options-expression.
-        # Healthcmd bruger containerens env ($POSTGRES_USER/$POSTGRES_DB).
         options: >-
           --health-cmd="pg_isready -U $POSTGRES_USER -d $POSTGRES_DB"
           --health-interval=10s
@@ -138,11 +136,12 @@ jobs:
           BASE_URL: http://127.0.0.1:8080
         run: scripts/smoke.sh
 
-      - name: Stop server & upload logs
+      - name: Stop server
         if: always()
         run: |
           if [ -f app.pid ]; then kill "$(cat app.pid)" || true; fi
           sleep 1
+
       - name: Upload app.log
         if: always()
         uses: actions/upload-artifact@v4
@@ -157,7 +156,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-
     steps:
       - uses: actions/checkout@v4
 
@@ -184,15 +182,12 @@ jobs:
     environment: produktion
     permissions:
       contents: read
-
     steps:
       - uses: actions/checkout@v4
 
       - name: Deploy to VM via SSH
         uses: appleboy/ssh-action@v1.1.0
         env:
-          DEPLOY_PATH: ${{ vars.DEPLOY_PATH || '/opt/whoknows' }}
-
           POSTGRES_USER: ${{ vars.POSTGRES_USER }}
           POSTGRES_DB: ${{ vars.POSTGRES_DB }}
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
@@ -207,7 +202,6 @@ jobs:
           NODE_EXPORTER_IMAGE: ${{ vars.NODE_EXPORTER_IMAGE || 'prom/node-exporter:latest' }}
           PROMETHEUS_IMAGE: ${{ vars.PROMETHEUS_IMAGE || 'prom/prometheus:latest' }}
           GRAFANA_IMAGE: ${{ vars.GRAFANA_IMAGE || 'grafana/grafana:latest' }}
-
         with:
           host: ${{ vars.PROD_SSH_HOST }}
           username: ${{ vars.PROD_SSH_USER }}
@@ -216,7 +210,8 @@ jobs:
           script: |
             set -euo pipefail
 
-            cd "${DEPLOY_PATH}"
+            DEPLOY_PATH="${{ vars.DEPLOY_PATH || '/opt/whoknows' }}"
+            cd "$DEPLOY_PATH"
 
             git fetch origin main
             git reset --hard origin/main
