@@ -11,28 +11,26 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # -------------------------
-  # Build + lint + tests
-  # -------------------------
   build:
     runs-on: ubuntu-latest
     env:
-      POSTGRES_USER: ${{ vars.CI_POSTGRES_USER || 'devops' }}
-      POSTGRES_DB: ${{ vars.CI_POSTGRES_DB || 'whoknows' }}
-      POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD || 'devops' }}
+      POSTGRES_USER: ${{ secrets.CI_POSTGRES_USER || vars.CI_POSTGRES_USER || 'devops' }}
+      POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD || vars.CI_POSTGRES_PASSWORD || 'devops' }}
+      POSTGRES_DB: ${{ secrets.CI_POSTGRES_DB || vars.CI_POSTGRES_DB || 'whoknows' }}
 
     services:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_USER: ${{ vars.CI_POSTGRES_USER || 'devops' }}
-          POSTGRES_DB: ${{ vars.CI_POSTGRES_DB || 'whoknows' }}
-          POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD || 'devops' }}
+          POSTGRES_USER: ${{ secrets.CI_POSTGRES_USER || vars.CI_POSTGRES_USER || 'devops' }}
+          POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD || vars.CI_POSTGRES_PASSWORD || 'devops' }}
+          POSTGRES_DB: ${{ secrets.CI_POSTGRES_DB || vars.CI_POSTGRES_DB || 'whoknows' }}
         ports:
           - 5432:5432
-        # IMPORTANT: secrets må ikke bruges her -> hold den statisk
+        # IMPORTANT: ingen secrets/vars i options-expression.
+        # Healthcmd bruger containerens env ($POSTGRES_USER/$POSTGRES_DB).
         options: >-
-          --health-cmd="pg_isready -U devops -d whoknows"
+          --health-cmd="pg_isready -U $POSTGRES_USER -d $POSTGRES_DB"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
@@ -42,8 +40,7 @@ jobs:
         go-version: ["1.25.x"]
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -51,9 +48,6 @@ jobs:
           go-version: ${{ matrix.go-version }}
           check-latest: true
           cache: true
-
-      - name: Print go version
-        run: go version
 
       - name: Download dependencies
         run: go mod download
@@ -64,7 +58,7 @@ jobs:
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v8
         with:
-          version: latest
+          version: v2.7.2
           args: ./...
 
       - name: Run tests (race + coverage)
@@ -76,10 +70,6 @@ jobs:
             -coverpkg=./cmd/server,./handlers,./internal/db \
             -coverprofile=coverage.out
 
-      - name: Show coverage summary
-        if: ${{ always() && hashFiles('coverage.out') != '' }}
-        run: go tool cover -func=coverage.out | sed -n '1,200p'
-
       - name: Upload coverage (artifact)
         if: ${{ hashFiles('coverage.out') != '' }}
         uses: actions/upload-artifact@v4
@@ -87,50 +77,41 @@ jobs:
           name: coverage-${{ matrix.go-version }}
           path: coverage.out
 
-  # -------------------------
-  # Dockerfile lint
-  # -------------------------
   hadolint:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
+      - uses: actions/checkout@v4
       - name: Lint Dockerfile
         uses: hadolint/hadolint-action@v3.1.0
         with:
           dockerfile: Dockerfile
 
-  # -------------------------
-  # Health / smoke test
-  # -------------------------
   healthz:
-    runs-on: ubuntu-latest
     needs: build
+    runs-on: ubuntu-latest
     env:
-      POSTGRES_USER: ${{ vars.CI_POSTGRES_USER || 'devops' }}
-      POSTGRES_DB: ${{ vars.CI_POSTGRES_DB || 'whoknows' }}
-      POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD || 'devops' }}
+      POSTGRES_USER: ${{ secrets.CI_POSTGRES_USER || vars.CI_POSTGRES_USER || 'devops' }}
+      POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD || vars.CI_POSTGRES_PASSWORD || 'devops' }}
+      POSTGRES_DB: ${{ secrets.CI_POSTGRES_DB || vars.CI_POSTGRES_DB || 'whoknows' }}
 
     services:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_USER: ${{ vars.CI_POSTGRES_USER || 'devops' }}
-          POSTGRES_DB: ${{ vars.CI_POSTGRES_DB || 'whoknows' }}
-          POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD || 'devops' }}
+          POSTGRES_USER: ${{ secrets.CI_POSTGRES_USER || vars.CI_POSTGRES_USER || 'devops' }}
+          POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD || vars.CI_POSTGRES_PASSWORD || 'devops' }}
+          POSTGRES_DB: ${{ secrets.CI_POSTGRES_DB || vars.CI_POSTGRES_DB || 'whoknows' }}
         ports:
           - 5432:5432
         options: >-
-          --health-cmd="pg_isready -U devops -d whoknows"
+          --health-cmd="pg_isready -U $POSTGRES_USER -d $POSTGRES_DB"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -157,12 +138,11 @@ jobs:
           BASE_URL: http://127.0.0.1:8080
         run: scripts/smoke.sh
 
-      - name: Stop server
+      - name: Stop server & upload logs
         if: always()
         run: |
           if [ -f app.pid ]; then kill "$(cat app.pid)" || true; fi
           sleep 1
-
       - name: Upload app.log
         if: always()
         uses: actions/upload-artifact@v4
@@ -170,9 +150,6 @@ jobs:
           name: app-log
           path: app.log
 
-  # -------------------------
-  # Build & push Docker image (only on push to main)
-  # -------------------------
   docker-build:
     needs: [build, hadolint, healthz]
     runs-on: ubuntu-latest
@@ -182,8 +159,7 @@ jobs:
       packages: write
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -201,27 +177,25 @@ jobs:
             ghcr.io/gitdengas123456/devops-valgfag:latest
             ghcr.io/gitdengas123456/devops-valgfag:${{ github.sha }}
 
-  # -------------------------
-  # Deploy to VM via SSH (compose + .env)
-  # -------------------------
   deploy:
     needs: docker-build
     runs-on: ubuntu-latest
-    environment: produktion
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment: produktion
     permissions:
       contents: read
 
     steps:
-      - name: Checkout code (for reference)
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Deploy to VM via SSH
         uses: appleboy/ssh-action@v1.1.0
         env:
+          DEPLOY_PATH: ${{ vars.DEPLOY_PATH || '/opt/whoknows' }}
+
           POSTGRES_USER: ${{ vars.POSTGRES_USER }}
-          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           POSTGRES_DB: ${{ vars.POSTGRES_DB }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
 
           SESSION_KEY: ${{ secrets.SESSION_KEY }}
           DMI_API_KEY: ${{ secrets.DMI_API_KEY }}
@@ -238,18 +212,15 @@ jobs:
           host: ${{ vars.PROD_SSH_HOST }}
           username: ${{ vars.PROD_SSH_USER }}
           key: ${{ secrets.PROD_SSH_KEY }}
-          port: ${{ vars.PROD_SSH_PORT }}
+          port: ${{ vars.PROD_SSH_PORT || '22' }}
           script: |
-            set -e
+            set -euo pipefail
 
-            echo "==> Going to app folder on VM..."
-            cd "${{ vars.DEPLOY_PATH }}"
+            cd "${DEPLOY_PATH}"
 
-            echo "==> Sync repo to origin/main..."
             git fetch origin main
             git reset --hard origin/main
 
-            echo "==> Writing .env on VM..."
             umask 077
             : > .env
             printf '%s=%s\n' "APP_ENV" "prod" >> .env
@@ -267,13 +238,6 @@ jobs:
             printf '%s=%s\n' "GRAFANA_IMAGE" "${GRAFANA_IMAGE}" >> .env
             chmod 600 .env
 
-            echo "==> Pulling latest image from GHCR..."
             docker compose pull
-
-            echo "==> Starting/restarting compose stack..."
             docker compose up -d --remove-orphans
-
-            echo "==> Cleaning up old images..."
             docker image prune -f
-
-            echo "Deployment finished."
