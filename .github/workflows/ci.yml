@@ -170,8 +170,8 @@ jobs:
       DMI_API_KEY: dummy-ci-key
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin
-      NODE_EXPORTER_IMAGE: prom/node-exporter:v1.8.2
-      PROMETHEUS_IMAGE: prom/prometheus:v2.54.1
+      NODE_EXPORTER_IMAGE: prom/node-exporter:v1.10.2
+      PROMETHEUS_IMAGE: prom/prometheus:v3.8.1
       GRAFANA_IMAGE: grafana/grafana:12.3.0
       APP_ENV: prod
 
