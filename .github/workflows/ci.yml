@@ -64,12 +64,15 @@ jobs:
 
       - name: Install golangci-lint (built with this Go)
         run: |
-          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
+          set -euxo pipefail
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
           go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.60.3
+          golangci-lint --version
 
       - name: Run golangci-lint
-        run: golangci-lint run ./...
-
+        run: |
+          set -euxo pipefail
+          golangci-lint run --timeout=5m --out-format=colored-line-number ./...
       - name: Run tests (race + coverage)
         env:
           DATABASE_URL: postgres://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@localhost:5432/${{ env.POSTGRES_DB }}?sslmode=disable
