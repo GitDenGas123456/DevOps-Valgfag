@@ -11,9 +11,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # -------------------------
-  # Build + lint + tests
-  # -------------------------
   build:
     runs-on: ubuntu-latest
 
@@ -52,6 +49,12 @@ jobs:
 
       - run: go version
       - run: go mod download
+
+      - name: Ensure modules are tidy
+        run: |
+          go mod tidy
+          git diff --exit-code
+
       - run: go vet ./...
 
       - name: Run golangci-lint
@@ -59,6 +62,7 @@ jobs:
         with:
           version: v2.1.6
           args: --timeout=5m ./...
+
       - name: Run tests
         env:
           DATABASE_URL: postgres://devops:devops@localhost:5432/whoknows?sslmode=disable
@@ -74,9 +78,6 @@ jobs:
           name: coverage-${{ matrix.go-version }}
           path: coverage.out
 
-  # -------------------------
-  # Dockerfile lint
-  # -------------------------
   hadolint:
     needs: build
     runs-on: ubuntu-latest
@@ -86,9 +87,6 @@ jobs:
         with:
           dockerfile: Dockerfile
 
-  # -------------------------
-  # Health / smoke test (native binary)
-  # -------------------------
   healthz:
     needs: build
     runs-on: ubuntu-latest
@@ -126,8 +124,10 @@ jobs:
 
       - name: Start server
         env:
+          PORT: "8080"
           DATABASE_URL: postgres://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@localhost:5432/${{ env.POSTGRES_DB }}?sslmode=disable
           SESSION_KEY: ci-session-key-0123456789-abcdefghijklmnopqrstuvwxyz
+          DMI_API_KEY: dummy-ci-key
           APP_ENV: prod
         run: |
           nohup ./server > app.log 2>&1 &
@@ -138,6 +138,12 @@ jobs:
         env:
           BASE_URL: http://127.0.0.1:8080
         run: scripts/smoke.sh
+
+      - name: Show app.log on failure
+        if: failure()
+        run: |
+          echo "----- app.log -----"
+          sed -n '1,200p' app.log || true
 
       - name: Stop server
         if: always()
@@ -151,15 +157,11 @@ jobs:
           name: app-log
           path: app.log
 
-  # -------------------------
-  # Compose-based integration (app + postgres_db)
-  # -------------------------
   compose-integration:
     needs: build
     runs-on: ubuntu-latest
 
     env:
-      # must satisfy docker-compose.yml requirements
       APP_IMAGE_TAG: ${{ github.sha }}
 
       POSTGRES_USER: devops
@@ -169,11 +171,9 @@ jobs:
       SESSION_KEY: ci-session-key-0123456789-abcdefghijklmnopqrstuvwxyz
       DMI_API_KEY: dummy-ci-key
 
-      # required by grafana in compose
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin
 
-      # optional images (compose has defaults, but we can set stable values)
       NODE_EXPORTER_IMAGE: prom/node-exporter:v1.8.2
       PROMETHEUS_IMAGE: prom/prometheus:v2.54.1
       GRAFANA_IMAGE: grafana/grafana:12.3.0
@@ -239,9 +239,6 @@ jobs:
         if: always()
         run: docker compose down -v
 
-  # -------------------------
-  # Build & push Docker image (only on push to main)
-  # -------------------------
   docker-build:
     needs: [build, hadolint, healthz, compose-integration]
     runs-on: ubuntu-latest
@@ -267,9 +264,6 @@ jobs:
           tags: |
             ghcr.io/gitdengas123456/devops-valgfag:latest
 
-  # -------------------------
-  # Deploy to VM via SSH (compose + .env)
-  # -------------------------
   deploy:
     needs: docker-build
     runs-on: ubuntu-latest
@@ -285,8 +279,6 @@ jobs:
       - name: Deploy to VM via SSH
         uses: appleboy/ssh-action@v1.1.0
         env:
-          # VM/repo path (YOU should set vars.DEPLOY_PATH = /home/adminuser/DevOps-Valgfag)
-          # DB + required app secrets
           POSTGRES_USER: ${{ vars.POSTGRES_USER }}
           POSTGRES_DB: ${{ vars.POSTGRES_DB }}
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
@@ -294,11 +286,9 @@ jobs:
           SESSION_KEY: ${{ secrets.SESSION_KEY }}
           DMI_API_KEY: ${{ secrets.DMI_API_KEY }}
 
-          # required by grafana in compose
           GF_SECURITY_ADMIN_USER: ${{ secrets.GF_SECURITY_ADMIN_USER }}
           GF_SECURITY_ADMIN_PASSWORD: ${{ secrets.GF_SECURITY_ADMIN_PASSWORD }}
 
-          # image tags/config
           APP_IMAGE_TAG: ${{ vars.APP_IMAGE_TAG }}
           NODE_EXPORTER_IMAGE: ${{ vars.NODE_EXPORTER_IMAGE }}
           PROMETHEUS_IMAGE: ${{ vars.PROMETHEUS_IMAGE }}
@@ -309,7 +299,6 @@ jobs:
           key: ${{ secrets.PROD_SSH_KEY }}
           port: ${{ vars.PROD_SSH_PORT }}
 
-          # IMPORTANT: without envs:, variables won't be available on the VM script side
           envs: >-
             POSTGRES_USER,POSTGRES_DB,POSTGRES_PASSWORD,
             SESSION_KEY,DMI_API_KEY,
@@ -318,32 +307,10 @@ jobs:
 
           script: |
             set -e
-
-            if [ -z "${POSTGRES_USER}" ] || [ -z "${POSTGRES_DB}" ] || [ -z "${POSTGRES_PASSWORD}" ]; then
-              echo "Missing POSTGRES_USER/POSTGRES_DB (vars) or POSTGRES_PASSWORD (secret) in environment 'produktion'"
-              exit 1
-            fi
-            if [ -z "${SESSION_KEY}" ] || [ -z "${DMI_API_KEY}" ]; then
-              echo "Missing SESSION_KEY or DMI_API_KEY in environment 'produktion'"
-              exit 1
-            fi
-            if [ -z "${GF_SECURITY_ADMIN_USER}" ] || [ -z "${GF_SECURITY_ADMIN_PASSWORD}" ]; then
-              echo "Missing GF_SECURITY_ADMIN_USER or GF_SECURITY_ADMIN_PASSWORD (secrets) in environment 'produktion'"
-              exit 1
-            fi
-            if [ -z "${APP_IMAGE_TAG}" ]; then
-              echo "Missing APP_IMAGE_TAG (vars) in environment 'produktion'"
-              exit 1
-            fi
-
-            echo "==> Going to app folder on VM..."
             cd ${{ vars.DEPLOY_PATH }}
-
-            echo "==> Sync repo to origin/main..."
             git fetch origin main
             git reset --hard origin/main
 
-            echo "==> Writing .env on VM..."
             umask 077
             cat > .env <<EOF
             APP_ENV=prod
@@ -366,13 +333,6 @@ jobs:
             EOF
             chmod 600 .env
 
-            echo "==> Pulling latest image from GHCR..."
             docker compose pull
-
-            echo "==> Starting/restarting compose stack..."
             docker compose up -d --remove-orphans
-
-            echo "==> Cleaning up old images..."
             docker image prune -f
-
-            echo "Deployment finished."
