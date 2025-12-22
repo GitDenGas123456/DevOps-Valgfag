@@ -16,7 +16,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.21' # adjust to your Go version
+          go-version: '1.24.11' # adjust to your Go version
 
       - name: Build Go program
         run: go build -o myapp ./cmd/server
