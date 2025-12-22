@@ -210,7 +210,7 @@ jobs:
           script: |
             set -euo pipefail
 
-            DEPLOY_PATH="${{ vars.DEPLOY_PATH || '/opt/whoknows' }}"
+            DEPLOY_PATH="/home/adminuser/DevOps-Valgfag"
             cd "$DEPLOY_PATH"
 
             git fetch origin main
