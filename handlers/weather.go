@@ -68,8 +68,8 @@ const (
 )
 
 var (
-	// Default timeout can be overriden via env: DMI_HTTP_TIMEOUT (f.eks "20s", "5s", "1m")
-	weatherTimeout = durationFromEnv("DMI_HTTP_TIMEOUT", 20*time.Second)
+	// Default timeout can be overridden via env: DMI_HTTP_TIMEOUT (e.g. "20s", "5s", "1m")
+	weatherTimeout = parseDurationEnv("DMI_HTTP_TIMEOUT", 20*time.Second)
 	weatherClient  = &http.Client{Timeout: weatherTimeout}
 )
 
@@ -113,7 +113,6 @@ func GetCopenhagenForecast(ctx context.Context) (*EDRFeatureCollection, error) {
 	}()
 
 	if resp.StatusCode != http.StatusOK {
-		// Read a small part of the body for better debugging (without spamming logs)
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
 		return nil, fmt.Errorf("%s (status %d): %s", weatherServiceUnavailableMsg, resp.StatusCode, strings.TrimSpace(string(body)))
 	}
@@ -126,7 +125,9 @@ func GetCopenhagenForecast(ctx context.Context) (*EDRFeatureCollection, error) {
 	return &data, nil
 }
 
-func durationFromEnv(key string, fallback time.Duration) time.Duration {
+// parseDurationEnv matches the naming convention used in cmd/server/main.go.
+// Kept local (no shared util refactor) to minimize risk/merge complexity.
+func parseDurationEnv(key string, fallback time.Duration) time.Duration {
 	v := strings.TrimSpace(os.Getenv(key))
 	if v == "" {
 		return fallback
@@ -150,7 +151,7 @@ func WeatherPageHandler(w http.ResponseWriter, r *http.Request) {
 		renderTemplate(w, r, "weather", map[string]any{
 			"Title":    "Copenhagen Forecast",
 			"Forecast": nil,
-			"Error":    err.Error(),
+			"Error":    weatherServiceUnavailableMsg, // <-- sanitize (don’t leak err.Error())
 		})
 		return
 	}
@@ -171,14 +172,6 @@ func WeatherPageHandler(w http.ResponseWriter, r *http.Request) {
 // API handler: /api/weather
 // ==========
 
-// APIWeatherHandler godoc
-// @Summary      Get weather forecast
-// @Description  Returns the current Copenhagen forecast used by the /weather page.
-// @Tags         API
-// @Produce      json
-// @Success      200  {object}  WeatherAPIResponse  "Forecast retrieved"
-// @Failure      503  {object}  APIErrorResponse    "Weather service unavailable"
-// @Router       /api/weather [get]
 func APIWeatherHandler(w http.ResponseWriter, r *http.Request) {
 	data, err := GetCopenhagenForecast(r.Context())
 	if err != nil {
