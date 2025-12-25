@@ -9,24 +9,6 @@
     {{ end }}
 
     {{ if .Forecast }}
-      {{ if .Stale }}
-        <p class="muted">
-          Showing last known forecast
-          {{ with .LastUpdated }}{{ if not .IsZero }} from {{ .Format "2006-01-02 15:04 MST" }}{{ end }}{{ end }}.
-        </p>
-      {{ else if .Cached }}
-        <p class="muted">
-          Served from cache
-          {{ with .LastUpdated }}{{ if not .IsZero }} (updated {{ .Format "15:04 MST" }}){{ end }}{{ end }}.
-        </p>
-      {{ else }}
-        {{ with .LastUpdated }}
-          {{ if not .IsZero }}
-            <p class="muted">Last updated {{ .Format "2006-01-02 15:04 MST" }}.</p>
-          {{ end }}
-        {{ end }}
-      {{ end }}
-
       <p><strong>Temperature:</strong> {{ .Forecast.Properties.Temperature }} °C</p>
       <p><strong>Wind Speed:</strong> {{ .Forecast.Properties.WindSpeed }} m/s</p>
       <p><strong>Wind Direction:</strong> {{ .Forecast.Properties.WindDir }}°</p>
