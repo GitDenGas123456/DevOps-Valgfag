@@ -1,25 +1,32 @@
 {{ define "weather" }}
-<!DOCTYPE html>
-<html>
-<head>
-  <title>{{ .Title }}</title>
-  <link rel="stylesheet" href="/static/styles.css">
-</head>
-<body>
-  <h1>{{ .Title }}</h1>
+  {{ template "header" . }}
 
-  {{ if .Error }}
-    <p style="color:red;">Error fetching forecast: {{ .Error }}</p>
-  {{ else if .Forecast }}
-    <p>Temperature: {{ .Forecast.Properties.Temperature }} °C</p>
-    <p>Wind Speed: {{ .Forecast.Properties.WindSpeed }} m/s</p>
-    <p>Wind Direction: {{ .Forecast.Properties.WindDir }}°</p>
-    <p>Step: {{ .Forecast.Properties.Step }}</p>
-  {{ else }}
-    <p>No forecast data available.</p>
-  {{ end }}
+  <section class="card">
+    <h1>{{ .Title }}</h1>
 
-  <a href="/">Back</a>
-</body>
-</html>
+    {{ if .Error }}
+      <div class="alert alert-error">Error fetching forecast: {{ .Error }}</div>
+    {{ end }}
+
+    {{ if .Forecast }}
+      {{ if .Stale }}
+        <p class="muted">Showing last known forecast{{ if not .LastUpdated.IsZero }} from {{ .LastUpdated.Format "2006-01-02 15:04 MST" }}{{ end }}.</p>
+      {{ else if .Cached }}
+        <p class="muted">Served from cache{{ if not .LastUpdated.IsZero }} (updated {{ .LastUpdated.Format "15:04 MST" }}){{ end }}.</p>
+      {{ else if not .LastUpdated.IsZero }}
+        <p class="muted">Last updated {{ .LastUpdated.Format "2006-01-02 15:04 MST" }}.</p>
+      {{ end }}
+
+      <p><strong>Temperature:</strong> {{ .Forecast.Properties.Temperature }} °C</p>
+      <p><strong>Wind Speed:</strong> {{ .Forecast.Properties.WindSpeed }} m/s</p>
+      <p><strong>Wind Direction:</strong> {{ .Forecast.Properties.WindDir }}°</p>
+      <p><strong>Step:</strong> {{ .Forecast.Properties.Step }}</p>
+    {{ else }}
+      <p class="muted"><em>No forecast data available.</em></p>
+    {{ end }}
+
+    <p><a href="/">← Back home</a></p>
+  </section>
+
+  {{ template "footer" . }}
 {{ end }}

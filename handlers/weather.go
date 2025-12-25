@@ -67,7 +67,11 @@ const (
 	weatherDataIncompleteMsg     = "weather data incomplete"
 )
 
-var weatherClient = &http.Client{Timeout: 5 * time.Second}
+var (
+	// Default timeout can be overriden via env: DMI_HTTP_TIMEOUT (f.eks "20s", "5s", "1m")
+	weatherTimeout = durationFromEnv("DMI_HTTP_TIMEOUT", 20*time.Second)
+	weatherClient  = &http.Client{Timeout: weatherTimeout}
+)
 
 // ==========
 // Weather fetcher
@@ -120,6 +124,18 @@ func GetCopenhagenForecast(ctx context.Context) (*EDRFeatureCollection, error) {
 	}
 
 	return &data, nil
+}
+
+func durationFromEnv(key string, fallback time.Duration) time.Duration {
+	v := strings.TrimSpace(os.Getenv(key))
+	if v == "" {
+		return fallback
+	}
+	d, err := time.ParseDuration(v)
+	if err != nil || d <= 0 {
+		return fallback
+	}
+	return d
 }
 
 // ==========
