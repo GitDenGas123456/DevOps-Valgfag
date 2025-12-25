@@ -10,11 +10,21 @@
 
     {{ if .Forecast }}
       {{ if .Stale }}
-        <p class="muted">Showing last known forecast{{ if not .LastUpdated.IsZero }} from {{ .LastUpdated.Format "2006-01-02 15:04 MST" }}{{ end }}.</p>
+        <p class="muted">
+          Showing last known forecast
+          {{ with .LastUpdated }}{{ if not .IsZero }} from {{ .Format "2006-01-02 15:04 MST" }}{{ end }}{{ end }}.
+        </p>
       {{ else if .Cached }}
-        <p class="muted">Served from cache{{ if not .LastUpdated.IsZero }} (updated {{ .LastUpdated.Format "15:04 MST" }}){{ end }}.</p>
-      {{ else if not .LastUpdated.IsZero }}
-        <p class="muted">Last updated {{ .LastUpdated.Format "2006-01-02 15:04 MST" }}.</p>
+        <p class="muted">
+          Served from cache
+          {{ with .LastUpdated }}{{ if not .IsZero }} (updated {{ .Format "15:04 MST" }}){{ end }}{{ end }}.
+        </p>
+      {{ else }}
+        {{ with .LastUpdated }}
+          {{ if not .IsZero }}
+            <p class="muted">Last updated {{ .Format "2006-01-02 15:04 MST" }}.</p>
+          {{ end }}
+        {{ end }}
       {{ end }}
 
       <p><strong>Temperature:</strong> {{ .Forecast.Properties.Temperature }} °C</p>
