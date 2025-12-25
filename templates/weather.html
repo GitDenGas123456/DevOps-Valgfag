@@ -6,9 +6,7 @@
 
     {{ if .Error }}
       <div class="alert alert-error">Error fetching forecast: {{ .Error }}</div>
-    {{ end }}
-
-    {{ if .Forecast }}
+    {{ else if .Forecast }}
       <p><strong>Temperature:</strong> {{ .Forecast.Properties.Temperature }} °C</p>
       <p><strong>Wind Speed:</strong> {{ .Forecast.Properties.WindSpeed }} m/s</p>
       <p><strong>Wind Direction:</strong> {{ .Forecast.Properties.WindDir }}°</p>
