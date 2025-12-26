@@ -199,7 +199,7 @@ func main() {
 	swaggerHandler := httpSwagger.WrapHandler
 	// Support both /swagger and /swagger/index.html (avoids 404 without trailing slash).
 	r.HandleFunc("/swagger", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "/swagger/index.html", http.StatusPermanentRedirect)
+		http.Redirect(w, r, "/swagger/index.html", http.StatusFound)
 	}).Methods(http.MethodGet, http.MethodHead)
 	r.PathPrefix("/swagger/").Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodHead {

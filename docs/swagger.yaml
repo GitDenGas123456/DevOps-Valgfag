@@ -91,6 +91,11 @@ paths:
   /api/logout:
     post:
       description: Clear the user session and redirect home.
+      parameters:
+      - description: session cookie (session=...)
+        in: header
+        name: Cookie
+        type: string
       produces:
       - text/html
       responses:

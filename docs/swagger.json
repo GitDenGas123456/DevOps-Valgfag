@@ -68,6 +68,14 @@
                     "Auth"
                 ],
                 "summary": "Logout user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "session cookie (session=...)",
+                        "name": "Cookie",
+                        "in": "header"
+                    }
+                ],
                 "responses": {
                     "302": {
                         "description": "Redirect to home page",
