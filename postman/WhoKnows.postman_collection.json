@@ -1,18 +1,15 @@
-{
-  "info": {
-    "_postman_id": "9a3efaae-0b4a-4d4a-9a4e-4d18a1baf0e1",
-    "name": "WhoKnows Prod QA",
-    "description": "Collection to exercise the WhoKnows production deployment at {{BASE_URL}} (auth flow, search, weather, health, metrics).",
-    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
-  },
-  "variable": [
-    {
-      "key": "BASE_URL",
-      "value": "https://gitdengas.dk",
-      "type": "string",
-      "description": "Base URL for the WhoKnows deployment"
-    }
-  ],
+{"info": {
+  "name": "WhoKnows QA",
+  "description": "Collection to exercise a WhoKnows deployment at {{BASE_URL}} (auth flow, search, weather, health, metrics)."
+},
+"variable": [
+  {
+    "key": "BASE_URL",
+    "value": "http://localhost:8080",
+    "type": "string",
+    "description": "Base URL for the WhoKnows deployment (override for prod/staging)"
+  }
+],
   "item": [
     {
       "name": "Health",

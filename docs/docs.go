@@ -178,6 +178,32 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/weather": {
+            "get": {
+                "description": "Returns the current Copenhagen forecast used by the /weather page.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Weather"
+                ],
+                "summary": "Get weather forecast",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.WeatherAPIResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.APIErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/healthz": {
             "get": {
                 "description": "Returns ok when the service is running.",
@@ -232,6 +258,14 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "handlers.APIErrorResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string"
+                }
+            }
+        },
         "handlers.APISearchResponse": {
             "type": "object",
             "properties": {
@@ -260,6 +294,45 @@ const docTemplate = `{
                 },
                 "url": {
                     "type": "string"
+                }
+            }
+        },
+        "handlers.WeatherAPIResponse": {
+            "type": "object",
+            "properties": {
+                "forecast": {
+                    "$ref": "#/definitions/handlers.WeatherForecast"
+                },
+                "location": {
+                    "$ref": "#/definitions/handlers.WeatherLocation"
+                }
+            }
+        },
+        "handlers.WeatherForecast": {
+            "type": "object",
+            "properties": {
+                "step": {
+                    "type": "string"
+                },
+                "temperature": {
+                    "type": "number"
+                },
+                "wind_direction": {
+                    "type": "number"
+                },
+                "wind_speed": {
+                    "type": "number"
+                }
+            }
+        },
+        "handlers.WeatherLocation": {
+            "type": "object",
+            "properties": {
+                "latitude": {
+                    "type": "number"
+                },
+                "longitude": {
+                    "type": "number"
                 }
             }
         }

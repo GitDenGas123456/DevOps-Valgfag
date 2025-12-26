@@ -1,5 +1,10 @@
 basePath: /
 definitions:
+  handlers.APIErrorResponse:
+    properties:
+      error:
+        type: string
+    type: object
   handlers.APISearchResponse:
     properties:
       search_results:
@@ -19,6 +24,31 @@ definitions:
         type: string
       url:
         type: string
+    type: object
+  handlers.WeatherAPIResponse:
+    properties:
+      forecast:
+        $ref: '#/definitions/handlers.WeatherForecast'
+      location:
+        $ref: '#/definitions/handlers.WeatherLocation'
+    type: object
+  handlers.WeatherForecast:
+    properties:
+      step:
+        type: string
+      temperature:
+        type: number
+      wind_direction:
+        type: number
+      wind_speed:
+        type: number
+    type: object
+  handlers.WeatherLocation:
+    properties:
+      latitude:
+        type: number
+      longitude:
+        type: number
     type: object
 info:
   contact: {}
@@ -136,6 +166,23 @@ paths:
       summary: Search content
       tags:
       - Search
+  /api/weather:
+    get:
+      description: Returns the current Copenhagen forecast used by the /weather page.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.WeatherAPIResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/handlers.APIErrorResponse'
+      summary: Get weather forecast
+      tags:
+      - Weather
   /healthz:
     get:
       description: Returns ok when the service is running.
