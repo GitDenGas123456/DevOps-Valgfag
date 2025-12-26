@@ -1,4 +1,4 @@
-.PHONY: check fmt vet lint test test-race build smoke docker verify-metrics grafana-ds-uid
+.PHONY: check fmt vet lint test build smoke docker verify-metrics grafana-ds-uid
 
 PORT ?= 8080
 LOG  ?= /tmp/whoknows.log
@@ -23,22 +23,18 @@ lint:
 test:
 	go test ./...
 
-# Valgfri lokalt: race-run
-test-race:
-	go test -race ./...
-
 build:
 	go build -o server ./cmd/server
 
 smoke: build
 	@set -e; \
 	./server >"$(LOG)" 2>&1 & echo $$! > .app.pid; \
+	trap 'kill $$(cat .app.pid) >/dev/null 2>&1 || true; rm -f .app.pid' EXIT; \
 	sleep 1; \
 	echo "Smoke: GET /healthz"; \
 	curl -fsS --max-time 2 "http://127.0.0.1:$(PORT)/healthz" | grep -qx "ok"; \
 	echo "Smoke: GET /readyz"; \
-	curl -fsS --max-time 2 "http://127.0.0.1:$(PORT)/readyz"  | grep -qx "ready"; \
-	kill `cat .app.pid` >/dev/null 2>&1 || true; rm -f .app.pid
+	curl -fsS --max-time 2 "http://127.0.0.1:$(PORT)/readyz"  | grep -qx "ready"
 
 verify-metrics:
 	@set -e; \
