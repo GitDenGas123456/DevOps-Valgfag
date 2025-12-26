@@ -1,10 +1,5 @@
 basePath: /
 definitions:
-  handlers.APIErrorResponse:
-    properties:
-      error:
-        type: string
-    type: object
   handlers.APISearchResponse:
     properties:
       search_results:
@@ -25,31 +20,6 @@ definitions:
       url:
         type: string
     type: object
-  handlers.WeatherAPIResponse:
-    properties:
-      forecast:
-        $ref: '#/definitions/handlers.WeatherForecast'
-      location:
-        $ref: '#/definitions/handlers.WeatherLocation'
-    type: object
-  handlers.WeatherForecast:
-    properties:
-      step:
-        type: string
-      temperature:
-        type: number
-      wind_direction:
-        type: number
-      wind_speed:
-        type: number
-    type: object
-  handlers.WeatherLocation:
-    properties:
-      latitude:
-        type: number
-      longitude:
-        type: number
-    type: object
 info:
   contact: {}
   description: 'API for the WhoKnows web app: session auth, search content, weather
@@ -61,7 +31,8 @@ paths:
     post:
       consumes:
       - application/x-www-form-urlencoded
-      description: Authenticate a user and start a session.
+      description: Authenticate a user and start a session. On failure, renders the
+        login page (HTTP 200) with an error message.
       parameters:
       - description: Username
         in: formData
@@ -106,7 +77,8 @@ paths:
     post:
       consumes:
       - application/x-www-form-urlencoded
-      description: Create a new user account.
+      description: Create a new user account. On validation errors, renders the register
+        page (HTTP 200) with an error message.
       parameters:
       - description: Username
         in: formData
@@ -164,23 +136,6 @@ paths:
       summary: Search content
       tags:
       - Search
-  /api/weather:
-    get:
-      description: Returns the current Copenhagen forecast used by the /weather page.
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: Forecast retrieved
-          schema:
-            $ref: '#/definitions/handlers.WeatherAPIResponse'
-        "503":
-          description: Weather service unavailable
-          schema:
-            $ref: '#/definitions/handlers.APIErrorResponse'
-      summary: Get weather forecast
-      tags:
-      - API
   /healthz:
     get:
       description: Returns ok when the service is running.
@@ -215,4 +170,9 @@ paths:
       summary: Readiness probe
       tags:
       - Health
+securityDefinitions:
+  sessionAuth:
+    in: header
+    name: Cookie
+    type: apiKey
 swagger: "2.0"

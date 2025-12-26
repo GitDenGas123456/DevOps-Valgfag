@@ -17,7 +17,7 @@ const docTemplate = `{
     "paths": {
         "/api/login": {
             "post": {
-                "description": "Authenticate a user and start a session.",
+                "description": "Authenticate a user and start a session. On failure, renders the login page (HTTP 200) with an error message.",
                 "consumes": [
                     "application/x-www-form-urlencoded"
                 ],
@@ -87,7 +87,7 @@ const docTemplate = `{
         },
         "/api/register": {
             "post": {
-                "description": "Create a new user account.",
+                "description": "Create a new user account. On validation errors, renders the register page (HTTP 200) with an error message.",
                 "consumes": [
                     "application/x-www-form-urlencoded"
                 ],
@@ -178,32 +178,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/weather": {
-            "get": {
-                "description": "Returns the current Copenhagen forecast used by the /weather page.",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "API"
-                ],
-                "summary": "Get weather forecast",
-                "responses": {
-                    "200": {
-                        "description": "Forecast retrieved",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.WeatherAPIResponse"
-                        }
-                    },
-                    "503": {
-                        "description": "Weather service unavailable",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.APIErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
         "/healthz": {
             "get": {
                 "description": "Returns ok when the service is running.",
@@ -258,14 +232,6 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "handlers.APIErrorResponse": {
-            "type": "object",
-            "properties": {
-                "error": {
-                    "type": "string"
-                }
-            }
-        },
         "handlers.APISearchResponse": {
             "type": "object",
             "properties": {
@@ -296,45 +262,13 @@ const docTemplate = `{
                     "type": "string"
                 }
             }
-        },
-        "handlers.WeatherAPIResponse": {
-            "type": "object",
-            "properties": {
-                "forecast": {
-                    "$ref": "#/definitions/handlers.WeatherForecast"
-                },
-                "location": {
-                    "$ref": "#/definitions/handlers.WeatherLocation"
-                }
-            }
-        },
-        "handlers.WeatherForecast": {
-            "type": "object",
-            "properties": {
-                "step": {
-                    "type": "string"
-                },
-                "temperature": {
-                    "type": "number"
-                },
-                "wind_direction": {
-                    "type": "number"
-                },
-                "wind_speed": {
-                    "type": "number"
-                }
-            }
-        },
-        "handlers.WeatherLocation": {
-            "type": "object",
-            "properties": {
-                "latitude": {
-                    "type": "number"
-                },
-                "longitude": {
-                    "type": "number"
-                }
-            }
+        }
+    },
+    "securityDefinitions": {
+        "sessionAuth": {
+            "type": "apiKey",
+            "name": "Cookie",
+            "in": "header"
         }
     }
 }`

@@ -3,6 +3,9 @@
 // @description API for the WhoKnows web app: session auth, search content, weather forecast, and health/readiness probes.
 // @BasePath /
 
+// @securityDefinitions.apikey sessionAuth
+// @in header
+// @name Cookie
 package main
 
 import (

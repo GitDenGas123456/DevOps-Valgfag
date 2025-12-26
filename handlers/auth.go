@@ -21,13 +21,17 @@ type User struct {
 	Password string
 }
 
-// APILoginHandler handles user login requests.
-// It validates the incoming form, checks the database for a matching user,
-// and verifies the password using bcrypt.
+// APILoginHandler authenticates a user and starts a cookie-based session.
+//
+// Behavior:
+// - Expects form fields: username, password (application/x-www-form-urlencoded).
+// - On success: stores the authenticated user_id in the "session" cookie and redirects to "/" (302).
+// - On failure (bad form / bad credentials): renders the login page with an error and returns 200.
+// - Avoids username enumeration by not distinguishing between "unknown user" and "wrong password".
 //
 // APILoginHandler godoc
 // @Summary      User login
-// @Description  Authenticate a user and start a session.
+// @Description  Authenticate a user and start a session. On failure, renders the login page (HTTP 200) with an error message.
 // @Tags         Auth
 // @Accept       application/x-www-form-urlencoded
 // @Produce      html
@@ -92,13 +96,16 @@ func APILoginHandler(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/", http.StatusFound)
 }
 
-// APIRegisterHandler handles new user registration.
-// It validates input, checks for existing usernames, hashes the password,
-// and inserts the user into PostgreSQL.
+// APIRegisterHandler creates a new user account.
+//
+// Behavior:
+// - Expects form fields: username, email, password, password2 (application/x-www-form-urlencoded).
+// - On success: inserts the user (bcrypt password hash) and redirects to "/login" (302).
+// - On validation / DB errors: renders the register page with an error and returns 200.
 //
 // APIRegisterHandler godoc
 // @Summary      Register user
-// @Description  Create a new user account.
+// @Description  Create a new user account. On validation errors, renders the register page (HTTP 200) with an error message.
 // @Tags         Auth
 // @Accept       application/x-www-form-urlencoded
 // @Produce      html
@@ -193,7 +200,12 @@ func APIRegisterHandler(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/login", http.StatusFound)
 }
 
-// APILogoutHandler logs out the user by removing the session value.
+// APILogoutHandler clears the current user's session and redirects home.
+//
+// Notes:
+// - If the user is not logged in, sessionStore.Get typically returns an empty session;
+//   the handler still redirects home after attempting to clear "user_id".
+// - Intended to be POST-only to avoid side effects on GET.
 //
 // APILogoutHandler godoc
 // @Summary      Logout user
