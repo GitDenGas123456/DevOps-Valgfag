@@ -19,9 +19,9 @@ lint:
 		echo "golangci-lint missing - skipping"; \
 	fi
 
-# Lokal test (CI kører race+coverage selv)
+# Lokal test (hurtig). CI kan køre race/coverage selv.
 test:
-	go test -race ./...
+	go test ./...
 
 build:
 	go build -o server ./cmd/server
@@ -29,25 +29,33 @@ build:
 smoke: build
 	@set -e; \
 	./server >"$(LOG)" 2>&1 & echo $$! > .app.pid; \
+	trap 'kill $$(cat .app.pid) >/dev/null 2>&1 || true; rm -f .app.pid' EXIT; \
 	sleep 1; \
-	URL="http://127.0.0.1:$(PORT)/healthz" scripts/smoke.sh; \
-	kill `cat .app.pid` >/dev/null 2>&1 || true; rm -f .app.pid
+	echo "Smoke: GET /healthz"; \
+	curl -fsS --max-time 2 "http://127.0.0.1:$(PORT)/healthz" | grep -qx "ok"; \
+	echo "Smoke: GET /readyz"; \
+	curl -fsS --max-time 2 "http://127.0.0.1:$(PORT)/readyz"  | grep -qx "ready"
 
 verify-metrics:
 	@set -e; \
-	echo "Checking server is up on /healthz (PORT=$(PORT))..."; \
+	echo "Checking server is up on /healthz and /readyz (PORT=$(PORT))..."; \
 	curl -fsS --max-time 2 "http://127.0.0.1:$(PORT)/healthz" >/dev/null || { \
-		echo "FAIL: server not responding on http://127.0.0.1:$(PORT)"; \
+		echo "FAIL: server not responding on http://127.0.0.1:$(PORT)/healthz"; \
 		echo "Start it first (e.g. make build && ./server)"; \
 		exit 1; \
 	}; \
-	echo "Curl /search and / to populate metrics..."; \
+	curl -fsS --max-time 2 "http://127.0.0.1:$(PORT)/readyz" >/dev/null || { \
+		echo "FAIL: server not responding on http://127.0.0.1:$(PORT)/readyz"; \
+		echo "Start it first (e.g. make build && ./server)"; \
+		exit 1; \
+	}; \
+	echo "Curl /search and /about to populate metrics..."; \
 	curl -fsS --max-time 5 "http://127.0.0.1:$(PORT)/search?q=abc" >/dev/null; \
-	curl -fsS --max-time 5 "http://127.0.0.1:$(PORT)/?q=abc" >/dev/null; \
-	echo "Expect both path=\"/search\" and path=\"/\" in app_http_requests_total:"; \
+	curl -fsS --max-time 5 "http://127.0.0.1:$(PORT)/about" >/dev/null; \
+	echo "Expect both path=\"/search\" and path=\"/about\" in app_http_requests_total:"; \
 	metrics="$$(curl -fsS --max-time 5 "http://127.0.0.1:$(PORT)/metrics" | grep 'app_http_requests_total' || true)"; \
 	echo "$$metrics" | grep -q 'path=\"/search\"' && echo "OK: /search present" || { echo "FAIL: /search missing"; exit 1; }; \
-	echo "$$metrics" | grep -q 'path=\"/\"'      && echo "OK: / present"      || { echo "FAIL: / missing"; exit 1; }
+	echo "$$metrics" | grep -q 'path=\"/about\"'  && echo "OK: /about present"  || { echo "FAIL: /about missing"; exit 1; }
 
 docker:
 	@if [ -f Dockerfile ]; then \
