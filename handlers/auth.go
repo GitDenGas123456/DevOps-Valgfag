@@ -38,7 +38,7 @@ type User struct {
 // @Param        username  formData  string  true   "Username"
 // @Param        password  formData  string  true   "Password"
 // @Success      302  {string}  string  "Redirect to home page"
-// @Failure      200  {string}  string  "Rendered login form with errors"
+// @Success      200  {string}  string  "Rendered login form with errors"
 // @Router       /api/login [post]
 func APILoginHandler(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
@@ -114,7 +114,7 @@ func APILoginHandler(w http.ResponseWriter, r *http.Request) {
 // @Param        password   formData  string  true   "Password"
 // @Param        password2  formData  string  true   "Password confirmation"
 // @Success      302  {string}  string  "Redirect to login page"
-// @Failure      200  {string}  string  "Rendered register form with errors"
+// @Success      200  {string}  string  "Rendered register form with errors"
 // @Router       /api/register [post]
 func APIRegisterHandler(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
@@ -212,6 +212,7 @@ func APIRegisterHandler(w http.ResponseWriter, r *http.Request) {
 // @Description  Clear the user session and redirect home.
 // @Tags         Auth
 // @Produce      html
+// @Param   Cookie  header  string  false  "session cookie (session=...)"
 // @Security     sessionAuth
 // @Success      302  {string}  string  "Redirect to home page"
 // @Router       /api/logout [post]
