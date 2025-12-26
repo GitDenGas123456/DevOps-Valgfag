@@ -27,7 +27,7 @@ func setupTestServer(t *testing.T) (*mux.Router, *sql.DB) {
 	}
 
 	// Seed database schema
-	if err := h.SeedDB(db); err != nil {
+	if err := h.InitSchema(db); err != nil {
 		_ = db.Close()
 		t.Fatal(err)
 	}
@@ -57,10 +57,11 @@ func setupTestServer(t *testing.T) (*mux.Router, *sql.DB) {
 
 	r.HandleFunc("/api/login", h.APILoginHandler).Methods(http.MethodPost)
 	r.HandleFunc("/api/register", h.APIRegisterHandler).Methods(http.MethodPost)
-	r.HandleFunc("/api/logout", h.APILogoutHandler).Methods(http.MethodPost, http.MethodGet)
+	r.HandleFunc("/api/logout", h.APILogoutHandler).Methods(http.MethodPost)
 	r.HandleFunc("/api/search", h.APISearchHandler).Methods(http.MethodGet)
 
 	r.HandleFunc("/healthz", h.Healthz).Methods(http.MethodGet)
+	r.HandleFunc("/readyz", h.Readyz).Methods(http.MethodGet)
 
 	return r, db
 }
@@ -142,5 +143,26 @@ func TestIntegration_Healthz(t *testing.T) {
 
 	if rr.Body.String() != "ok" {
 		t.Fatalf("expected body 'ok', got '%s'", rr.Body.String())
+	}
+}
+
+func TestIntegration_Readyz(t *testing.T) {
+	router, db := setupTestServer(t)
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Errorf("failed to close db: %v", err)
+		}
+	}()
+
+	req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
+	rr := httptest.NewRecorder()
+	router.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200 for /readyz, got %d", rr.Code)
+	}
+
+	if strings.TrimSpace(rr.Body.String()) != "ready" {
+		t.Fatalf("expected body 'ready', got '%s'", rr.Body.String())
 	}
 }
