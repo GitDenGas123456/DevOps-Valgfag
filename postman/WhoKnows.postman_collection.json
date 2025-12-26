@@ -1,0 +1,376 @@
+{
+  "info": {
+    "_postman_id": "9a3efaae-0b4a-4d4a-9a4e-4d18a1baf0e1",
+    "name": "WhoKnows Prod QA",
+    "description": "Collection to exercise the WhoKnows production deployment at {{BASE_URL}} (auth flow, search, weather, health, metrics).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "BASE_URL",
+      "value": "https://gitdengas.dk",
+      "type": "string",
+      "description": "Base URL for the WhoKnows deployment"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Healthz",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('body is ok', () => pm.expect(pm.response.text()).to.eql('ok'));",
+                  "pm.test('responds < 200ms', () => pm.expect(pm.response.responseTime).to.be.below(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{BASE_URL}}/healthz"
+          }
+        },
+        {
+          "name": "Readyz",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200 (db ready)', () => pm.response.to.have.status(200));",
+                  "pm.test('body is ready', () => pm.expect(pm.response.text()).to.eql('ready'));",
+                  "pm.test('responds < 400ms', () => pm.expect(pm.response.responseTime).to.be.below(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{BASE_URL}}/readyz"
+          }
+        },
+        {
+          "name": "Metrics",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('metrics is exposed or protected', () => { pm.expect([200, 401, 403]).to.include(pm.response.code); });",
+                  "if (pm.response.code === 200) {",
+                  "  pm.test('metrics text includes app_http_requests_total', () => pm.expect(pm.response.text()).to.include('app_http_requests_total'));",
+                  "}",
+                  "pm.test('responds < 500ms', () => pm.expect(pm.response.responseTime).to.be.below(500));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{BASE_URL}}/metrics"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const suffix = Date.now();",
+                  "pm.collectionVariables.set('TEST_USERNAME', `qa_${suffix}`);",
+                  "pm.collectionVariables.set('TEST_EMAIL', `qa_${suffix}@example.com`);",
+                  "pm.collectionVariables.set('TEST_PASSWORD', 'P@ssw0rd!42');",
+                  "pm.collectionVariables.set('TEST_PASSWORD2', 'P@ssw0rd!42');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('register redirects (302)', () => pm.expect(pm.response.code).to.eql(302));",
+                  "pm.test('redirects to login page', () => pm.expect(pm.response.headers.get('Location')).to.include('/login'));",
+                  "pm.test('responds < 1000ms', () => pm.expect(pm.response.responseTime).to.be.below(1000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "username",
+                  "value": "{{TEST_USERNAME}}",
+                  "type": "text"
+                },
+                {
+                  "key": "email",
+                  "value": "{{TEST_EMAIL}}",
+                  "type": "text"
+                },
+                {
+                  "key": "password",
+                  "value": "{{TEST_PASSWORD}}",
+                  "type": "text"
+                },
+                {
+                  "key": "password2",
+                  "value": "{{TEST_PASSWORD2}}",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": "{{BASE_URL}}/api/register",
+            "description": "Form POST used by the HTML register page"
+          },
+          "protocolProfileBehavior": {
+            "followRedirects": false
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get('TEST_USERNAME')) { throw new Error('Run Register first to create credentials'); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('login redirects (302)', () => pm.expect(pm.response.code).to.eql(302));",
+                  "const setCookie = pm.response.headers.get('Set-Cookie') || '';",
+                  "const match = setCookie.match(/session=([^;]+)/);",
+                  "pm.test('session cookie issued', () => pm.expect(match, 'Set-Cookie session=').to.not.be.null);",
+                  "if (match) { pm.collectionVariables.set('SESSION_COOKIE', match[1]); }",
+                  "pm.test('responds < 800ms', () => pm.expect(pm.response.responseTime).to.be.below(800));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "username",
+                  "value": "{{TEST_USERNAME}}",
+                  "type": "text"
+                },
+                {
+                  "key": "password",
+                  "value": "{{TEST_PASSWORD}}",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": "{{BASE_URL}}/api/login",
+            "description": "Form POST used by the HTML login page"
+          },
+          "protocolProfileBehavior": {
+            "followRedirects": false
+          }
+        },
+        {
+          "name": "Logout",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const session = pm.collectionVariables.get('SESSION_COOKIE');",
+                  "if (!session) { throw new Error('SESSION_COOKIE not set; run Login first.'); }",
+                  "pm.request.headers.upsert({ key: 'Cookie', value: `session=${session}` });"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('logout redirects (302)', () => pm.expect(pm.response.code).to.eql(302));",
+                  "pm.test('redirects to home', () => pm.expect(pm.response.headers.get('Location')).to.include('/'));",
+                  "pm.test('responds < 600ms', () => pm.expect(pm.response.responseTime).to.be.below(600));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{BASE_URL}}/api/logout",
+            "description": "Clears session cookie"
+          },
+          "protocolProfileBehavior": {
+            "followRedirects": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "Search",
+      "item": [
+        {
+          "name": "Search (authenticated)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const session = pm.collectionVariables.get('SESSION_COOKIE');",
+                  "if (!session) { throw new Error('SESSION_COOKIE not set; run Login first.'); }",
+                  "pm.request.headers.upsert({ key: 'Cookie', value: `session=${session}` });"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('responds < 1200ms', () => pm.expect(pm.response.responseTime).to.be.below(1200));",
+                  "const body = pm.response.json();",
+                  "pm.test('has search_results array', () => { pm.expect(body).to.have.property('search_results'); pm.expect(body.search_results).to.be.an('array'); });",
+                  "pm.test('first result shape (if any)', () => {",
+                  "  if (body.search_results.length > 0) {",
+                  "    const first = body.search_results[0];",
+                  "    pm.expect(first).to.have.property('language');",
+                  "    const hasContent = Object.prototype.hasOwnProperty.call(first, 'content');",
+                  "    const hasTitleUrl = Object.prototype.hasOwnProperty.call(first, 'title') && Object.prototype.hasOwnProperty.call(first, 'url');",
+                  "    pm.expect(hasContent || hasTitleUrl, 'expected content or (title+url)').to.be.true;",
+                  "  } else {",
+                  "    pm.expect(body.search_results.length).to.eql(0);",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{BASE_URL}}/api/search?q=denmark&language=en",
+            "description": "Search API with optional Wikipedia enrichment"
+          }
+        },
+        {
+          "name": "Search without session (negative)",
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('search without auth should be rejected (401/403)', () => pm.expect([401, 403]).to.include(pm.response.code));",
+                  "pm.test('responds < 800ms', () => pm.expect(pm.response.responseTime).to.be.below(800));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{BASE_URL}}/api/search?q=denmark&language=en",
+            "description": "Negative check to ensure search is not anonymous if auth is required"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Weather",
+      "item": [
+        {
+          "name": "Weather",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const session = pm.collectionVariables.get('SESSION_COOKIE');",
+                  "if (session) {",
+                  "  pm.request.headers.upsert({ key: 'Cookie', value: `session=${session}` });",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('responds < 1500ms', () => pm.expect(pm.response.responseTime).to.be.below(1500));",
+                  "const body = pm.response.json();",
+                  "pm.test('has location + forecast shape', () => {",
+                  "  pm.expect(body).to.have.property('location');",
+                  "  pm.expect(body).to.have.property('forecast');",
+                  "  pm.expect(body.location).to.have.property('latitude');",
+                  "  pm.expect(body.location).to.have.property('longitude');",
+                  "  pm.expect(body.forecast).to.have.property('temperature');",
+                  "  pm.expect(body.forecast).to.have.property('wind_speed');",
+                  "  pm.expect(body.forecast).to.have.property('wind_direction');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{BASE_URL}}/api/weather",
+            "description": "Weather API; fails if DMI_API_KEY is missing or upstream returns 503"
+          }
+        }
+      ]
+    }
+  ]
+}

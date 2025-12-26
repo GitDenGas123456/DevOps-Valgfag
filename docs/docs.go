@@ -61,7 +61,7 @@ const docTemplate = `{
             }
         },
         "/api/logout": {
-            "get": {
+            "post": {
                 "security": [
                     {
                         "sessionAuth": []
@@ -336,13 +336,6 @@ const docTemplate = `{
                 }
             }
         }
-    },
-    "securityDefinitions": {
-        "sessionAuth": {
-            "type": "apiKey",
-            "name": "Cookie",
-            "in": "header"
-        }
     }
 }`
 
@@ -353,7 +346,7 @@ var SwaggerInfo = &swag.Spec{
 	BasePath:         "/",
 	Schemes:          []string{},
 	Title:            "WhoKnows API",
-	Description:      "Application user with login credentials",
+	Description:      "API for the WhoKnows web app: session auth, search content, weather forecast, and health/readiness probes.",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",
