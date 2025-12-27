@@ -46,6 +46,7 @@ func setupTestServer(t *testing.T) (*mux.Router, *sql.DB) {
 
 	// Init handlers
 	h.Init(db, tmpl, sessionStore)
+	h.EnableExternalSearch(false) // deterministic/offline tests
 
 	// Router setup
 	r := mux.NewRouter()
