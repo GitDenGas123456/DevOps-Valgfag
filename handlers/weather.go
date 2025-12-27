@@ -172,6 +172,14 @@ func WeatherPageHandler(w http.ResponseWriter, r *http.Request) {
 // API handler: /api/weather
 // ==========
 
+// APIWeatherHandler godoc
+// @Summary      Get weather forecast
+// @Description  Returns the current Copenhagen forecast used by the /weather page.
+// @Tags         Weather
+// @Produce      json
+// @Success      200  {object}  WeatherAPIResponse
+// @Failure      503  {object}  APIErrorResponse
+// @Router       /api/weather [get]
 func APIWeatherHandler(w http.ResponseWriter, r *http.Request) {
 	data, err := GetCopenhagenForecast(r.Context())
 	if err != nil {
