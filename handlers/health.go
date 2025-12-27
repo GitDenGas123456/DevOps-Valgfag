@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"log"
 	"net/http"
 	"time"
 )
@@ -16,6 +17,13 @@ import (
 // @Router       /healthz [get]
 func Healthz(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+
+	// Avoid writing a body for HEAD requests.
+	if r.Method == http.MethodHead {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
 	w.WriteHeader(http.StatusOK)
 
 	// If the client disconnects while writing, Write may error.
@@ -33,6 +41,26 @@ func Healthz(w http.ResponseWriter, r *http.Request) {
 func Readyz(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 
+	// Avoid writing a body for HEAD requests.
+	if r.Method == http.MethodHead {
+		if db == nil {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+
+		if err := db.PingContext(ctx); err != nil {
+			log.Printf("readyz: db ping failed: %v", err)
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
 	if db == nil {
 		http.Error(w, "database not configured", http.StatusServiceUnavailable)
 		return
@@ -44,6 +72,7 @@ func Readyz(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	if err := db.PingContext(ctx); err != nil {
+		log.Printf("readyz: db ping failed: %v", err)
 		http.Error(w, "database not ready", http.StatusServiceUnavailable)
 		return
 	}
