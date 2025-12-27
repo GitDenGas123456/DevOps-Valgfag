@@ -201,9 +201,13 @@ func main() {
 	r.HandleFunc("/swagger", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/swagger/index.html", http.StatusFound)
 	}).Methods(http.MethodGet, http.MethodHead)
+	
 	r.PathPrefix("/swagger/").Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodHead {
-			r.Method = http.MethodGet
+			r2 := r.Clone(r.Context())
+			r2.Method = http.MethodGet
+			swaggerHandler.ServeHTTP(w, r2)
+			return
 		}
 		swaggerHandler.ServeHTTP(w, r)
 	})).Methods(http.MethodGet, http.MethodHead)
