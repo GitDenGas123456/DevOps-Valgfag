@@ -44,7 +44,7 @@ func APILoginHandler(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		renderTemplate(w, r, "login", map[string]any{
 			"Title": loginTitle,
-			"error": "Bad request",
+			"Error": "Bad request",
 		})
 		return
 	}
@@ -64,8 +64,8 @@ func APILoginHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil || bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(password)) != nil {
 		renderTemplate(w, r, "login", map[string]any{
 			"Title":    loginTitle,
-			"error":    "Invalid username or password",
-			"username": username,
+			"Error":    "Invalid username or password",
+			"Username": username,
 		})
 		return
 	}
@@ -76,8 +76,8 @@ func APILoginHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("sessionStore.Get error (login): %v", err)
 		renderTemplate(w, r, "login", map[string]any{
 			"Title":    loginTitle,
-			"error":    "Internal server error",
-			"username": username,
+			"Error":    "Internal server error",
+			"Username": username,
 		})
 		return
 	}
@@ -87,8 +87,8 @@ func APILoginHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("sess.Save error (login): %v", err)
 		renderTemplate(w, r, "login", map[string]any{
 			"Title":    loginTitle,
-			"error":    "Internal server error",
-			"username": username,
+			"Error":    "Internal server error",
+			"Username": username,
 		})
 		return
 	}
@@ -120,7 +120,7 @@ func APIRegisterHandler(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		renderTemplate(w, r, "register", map[string]any{
 			"Title": registerTitle,
-			"error": "Bad request",
+			"Error": "Bad request",
 		})
 		return
 	}
@@ -134,7 +134,7 @@ func APIRegisterHandler(w http.ResponseWriter, r *http.Request) {
 	if username == "" || email == "" || pw1 == "" {
 		renderTemplate(w, r, "register", map[string]any{
 			"Title": registerTitle,
-			"error": "All fields required",
+			"Error": "All fields required",
 		})
 		return
 	}
@@ -143,7 +143,7 @@ func APIRegisterHandler(w http.ResponseWriter, r *http.Request) {
 	if pw1 != pw2 {
 		renderTemplate(w, r, "register", map[string]any{
 			"Title": registerTitle,
-			"error": "Passwords do not match",
+			"Error": "Passwords do not match",
 		})
 		return
 	}
@@ -158,7 +158,7 @@ func APIRegisterHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("register exists query error: %v", err)
 		renderTemplate(w, r, "register", map[string]any{
 			"Title": registerTitle,
-			"error": "Database error",
+			"Error": "Database error",
 		})
 		return
 	}
@@ -166,7 +166,7 @@ func APIRegisterHandler(w http.ResponseWriter, r *http.Request) {
 	if exists > 0 {
 		renderTemplate(w, r, "register", map[string]any{
 			"Title": registerTitle,
-			"error": "Username already in use",
+			"Error": "Username already in use",
 		})
 		return
 	}
@@ -177,7 +177,7 @@ func APIRegisterHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("bcrypt.GenerateFromPassword error: %v", err)
 		renderTemplate(w, r, "register", map[string]any{
 			"Title": registerTitle,
-			"error": "Internal error, please try again",
+			"Error": "Internal error, please try again",
 		})
 		return
 	}
@@ -191,7 +191,7 @@ func APIRegisterHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("register insert error: %v", err)
 		renderTemplate(w, r, "register", map[string]any{
 			"Title": registerTitle,
-			"error": "Registration failed",
+			"Error": "Registration failed",
 		})
 		return
 	}
@@ -212,7 +212,6 @@ func APIRegisterHandler(w http.ResponseWriter, r *http.Request) {
 // @Description  Clear the user session and redirect home.
 // @Tags         Auth
 // @Produce      html
-// @Param   Cookie  header  string  false  "session cookie (session=...)"
 // @Security     sessionAuth
 // @Success      302  {string}  string  "Redirect to home page"
 // @Router       /api/logout [post]
