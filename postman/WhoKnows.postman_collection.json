@@ -1,15 +1,17 @@
-{"info": {
-  "name": "WhoKnows QA",
-  "description": "Collection to exercise a WhoKnows deployment at {{BASE_URL}} (auth flow, search, weather, health, metrics)."
-},
-"variable": [
-  {
-    "key": "BASE_URL",
-    "value": "http://localhost:8080",
-    "type": "string",
-    "description": "Base URL for the WhoKnows deployment (override for prod/staging)"
-  }
-],
+{
+  "info": {
+    "name": "WhoKnows QA",
+    "description": "Collection to exercise a WhoKnows deployment at {{BASE_URL}} (auth flow, search, weather, health, metrics).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "BASE_URL",
+      "value": "http://localhost:8080",
+      "type": "string",
+      "description": "Base URL for the WhoKnows deployment (override for prod/staging)"
+    }
+  ],
   "item": [
     {
       "name": "Health",
@@ -93,10 +95,11 @@
                 "type": "text/javascript",
                 "exec": [
                   "const suffix = Date.now();",
+                  "// Test-only credentials for automated QA; not used for real user accounts.",
                   "pm.collectionVariables.set('TEST_USERNAME', `qa_${suffix}`);",
                   "pm.collectionVariables.set('TEST_EMAIL', `qa_${suffix}@example.com`);",
-                  "pm.collectionVariables.set('TEST_PASSWORD', 'P@ssw0rd!42');",
-                  "pm.collectionVariables.set('TEST_PASSWORD2', 'P@ssw0rd!42');"
+                  "pm.collectionVariables.set('TEST_PASSWORD', `QaTest_${suffix}_9fB#z`);",
+                  "pm.collectionVariables.set('TEST_PASSWORD2', `QaTest_${suffix}_9fB#z`);"
                 ]
               }
             },
