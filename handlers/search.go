@@ -16,46 +16,60 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-var useFTSSearch atomic.Bool
-var externalEnabled atomic.Bool
+// Feature flags toggled at startup (typically from env vars in main).
+// atomic.Bool allows safe concurrent reads from HTTP handlers without locks.
+var useFTSSearch atomic.Bool    // Prefer PostgreSQL FTS over ILIKE when enabled.
+var externalEnabled atomic.Bool // Allow optional Wikipedia enrichment (disabled in tests/CI for determinism).
 
 func init() {
+	// Default behavior: allow external enrichment.
+	// Tests/CI can disable this with EnableExternalSearch(false).
 	externalEnabled.Store(true)
 }
 
 const (
-	pageLimit       = 50
-	apiLimit        = 10
-	requestTimeout  = 2 * time.Second
-	snippetLen      = 200
+	// UI vs API limits: UI is for humans (more results), API is for machines (smaller payload).
+	pageLimit = 50
+	apiLimit  = 10
+
+	// Upper bound on search execution time (primarily DB calls via QueryContext).
+	requestTimeout = 2 * time.Second
+
+	// Max length of snippet text returned per result.
+	snippetLen = 200
+
 	rowsCloseErrMsg = "rows.Close error:"
 )
 
-// EnableFTSSearch toggles FTS usage for search endpoints.
-func EnableFTSSearch(on bool) { 
-	useFTSSearch.Store(on) 
+// EnableFTSSearch toggles PostgreSQL full-text search (FTS) usage.
+// When enabled, queryLocal() tries FTS first and falls back to ILIKE if needed.
+func EnableFTSSearch(on bool) {
+	useFTSSearch.Store(on)
 }
 
 // EnableExternalSearch toggles external Wikipedia enrichment.
-func EnableExternalSearch(on bool) { 
-	externalEnabled.Store(on) 
+// Keep this OFF in tests to avoid network calls and flaky CI.
+func EnableExternalSearch(on bool) {
+	externalEnabled.Store(on)
 }
 
-// SearchResult represents a single search result row.
+// SearchResult is the normalized result shape used by both UI and API.
+// Local DB results use a real ID; external cached results set ID=0.
 type SearchResult struct {
 	ID          int    `json:"id"`
 	Title       string `json:"title"`
 	URL         string `json:"url"`
 	Language    string `json:"language"`
-	Description string `json:"description"`
+	Description string `json:"description"` // Snippet (local content or external snippet)
 }
 
-// APISearchResponse is the JSON payload returned by the search API.
+// APISearchResponse is the stable JSON contract returned by /api/search.
 type APISearchResponse struct {
 	SearchResults []SearchResult `json:"search_results"`
 }
 
-// HomePageHandler renders the landing page and redirects searches to /search.
+// HomePageHandler renders the landing page.
+// If the user provides a query (?q=...), we redirect to /search so search logic lives in one place.
 func HomePageHandler(w http.ResponseWriter, r *http.Request) {
 	if q := r.URL.Query().Get("q"); q != "" {
 		target := "/search"
@@ -66,6 +80,7 @@ func HomePageHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Empty search page (no query, no results).
 	renderTemplate(w, r, "search", map[string]any{
 		"Title":   "Home",
 		"Query":   "",
@@ -76,7 +91,11 @@ func HomePageHandler(w http.ResponseWriter, r *http.Request) {
 // -----------------------------------------------------------------------------
 // WEB PAGE SEARCH HANDLER
 // -----------------------------------------------------------------------------
+
+// SearchPageHandler serves HTML search results for the web UI.
+// It allows optional external enrichment to improve user experience.
 func SearchPageHandler(w http.ResponseWriter, r *http.Request) {
+	// Defensive check: avoid nil pointer panics if DB wiring/configuration fails.
 	if db == nil {
 		http.Error(w, "database not configured", http.StatusInternalServerError)
 		return
@@ -85,8 +104,10 @@ func SearchPageHandler(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query().Get("q")
 	lang := getLanguage(r)
 
+	// Shared search pipeline (UI settings: pageLimit + includeExternal).
 	results := runSearch(r, q, lang, pageLimit, true)
 
+	// Used for calculating "hit rate" (searches that return at least one result).
 	if len(results) > 0 {
 		metrics.SearchWithResult.Inc()
 	}
@@ -101,9 +122,10 @@ func SearchPageHandler(w http.ResponseWriter, r *http.Request) {
 // -----------------------------------------------------------------------------
 // API SEARCH HANDLER
 // -----------------------------------------------------------------------------
+
 // APISearchHandler godoc
 // @Summary      Search content
-// @Description  Search stored pages and cached external results.
+// @Description  Search stored pages (local database). Requires session auth.
 // @Tags         Search
 // @Produce      json
 // @Param        q          query  string  false  "Search query"
@@ -116,7 +138,7 @@ func APISearchHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Enforce session auth for API (matches your Postman negative test).
+	// API requires an authenticated session
 	if !isAuthenticated(r) {
 		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "unauthorized"})
 		return
@@ -125,6 +147,7 @@ func APISearchHandler(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query().Get("q")
 	lang := getLanguage(r)
 
+	// API settings: smaller limit + no external enrichment for predictability and stability.
 	results := runSearch(r, q, lang, apiLimit, false)
 
 	if len(results) > 0 {
@@ -137,6 +160,15 @@ func APISearchHandler(w http.ResponseWriter, r *http.Request) {
 // -----------------------------------------------------------------------------
 // Shared search runner (metrics + timeout + best-effort behavior)
 // -----------------------------------------------------------------------------
+
+// runSearch is the shared search pipeline used by both UI and API.
+// It handles:
+//   - input sanitization
+//   - metrics (count + latency)
+//   - request-scoped timeout
+//   - local DB search (FTS preferred, ILIKE fallback)
+//   - optional external enrichment
+//   - final result capping for predictable response sizes
 func runSearch(r *http.Request, q, lang string, limit int, includeExternal bool) []SearchResult {
 	q = strings.TrimSpace(q)
 	if q == "" {
@@ -156,10 +188,13 @@ func runSearch(r *http.Request, q, lang string, limit int, includeExternal bool)
 		local = []SearchResult{}
 	}
 
+	// Optional enrichment: only for UI and only if enabled.
 	if includeExternal && externalEnabled.Load() {
 		ext := loadExternalBestEffort(q, lang)
 		local = append(local, ext...)
 	}
+
+	// Enforce final cap (external results should not expand response beyond the configured limit).
 	if len(local) > limit {
 		local = local[:limit]
 	}
@@ -170,6 +205,9 @@ func runSearch(r *http.Request, q, lang string, limit int, includeExternal bool)
 // -----------------------------------------------------------------------------
 // Local DB search (FTS preferred + fallback)
 // -----------------------------------------------------------------------------
+
+// queryLocal performs the local DB search.
+// If FTS is enabled, it tries FTS first and falls back to ILIKE if we get a FTS error.
 func queryLocal(ctx context.Context, q, lang string, limit int) ([]SearchResult, error) {
 	if useFTSSearch.Load() {
 		res, err := queryFTS(ctx, q, lang, limit)
@@ -181,6 +219,8 @@ func queryLocal(ctx context.Context, q, lang string, limit int) ([]SearchResult,
 	return queryILIKE(ctx, q, lang, limit)
 }
 
+// queryFTS performs ranked PostgreSQL full-text search against pages.content_tsv.
+// NOTE: 'simple' config matches the migration that builds content_tsv using to_tsvector('simple', ...).
 func queryFTS(ctx context.Context, q, lang string, limit int) ([]SearchResult, error) {
 	const sqlFTS = `
 WITH qq AS (SELECT plainto_tsquery('simple', $2) AS query)
@@ -198,6 +238,8 @@ LIMIT $4;`
 	return scanRows(rows)
 }
 
+// queryILIKE is a simple substring search fallback.
+// It is used when FTS is disabled or unavailable (e.g., missing migration/index).
 func queryILIKE(ctx context.Context, q, lang string, limit int) ([]SearchResult, error) {
 	const sqlILIKE = `
 SELECT id, title, url, language, LEFT(content, $3) AS snippet
@@ -214,6 +256,7 @@ LIMIT $4;`
 	return scanRows(rows)
 }
 
+// scanRows converts SQL rows to []SearchResult and guarantees rows.Close() is called.
 func scanRows(rows *sql.Rows) ([]SearchResult, error) {
 	defer func() {
 		if err := rows.Close(); err != nil {
@@ -237,10 +280,14 @@ func scanRows(rows *sql.Rows) ([]SearchResult, error) {
 }
 
 // -----------------------------------------------------------------------------
-// External enrichment (Wikipedia) - best effort + cache
+// External enrichment (Wikipedia)
 // -----------------------------------------------------------------------------
+
+// loadExternalBestEffort returns cached Wikipedia results for (query, lang).
+// If no cache exists, it performs a scrape and stores results in the DB.
+// Failures are logged but do not fail the request (best-effort enrichment).
 func loadExternalBestEffort(q, lang string) []SearchResult {
-	// ensure cache (best effort)
+	// Ensure cache exists (best effort).
 	if !dbx.ExternalExists(db, q, lang) {
 		scraped, err := scraper.WikipediaSearch(q, 10)
 		if err != nil {
@@ -279,6 +326,8 @@ func loadExternalBestEffort(q, lang string) []SearchResult {
 	return out
 }
 
+// getLanguage reads the requested language code.
+// Default is "en" for predictable behavior.
 func getLanguage(r *http.Request) string {
 	lang := r.URL.Query().Get("language")
 	if lang == "" {
