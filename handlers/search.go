@@ -336,5 +336,3 @@ func getLanguage(r *http.Request) string {
 	return lang
 }
 
-// Silence unused import warning if sql is referenced by build tags elsewhere.
-var _ = sql.ErrNoRows
