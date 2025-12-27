@@ -214,6 +214,7 @@ func APIRegisterHandler(w http.ResponseWriter, r *http.Request) {
 // @Produce      html
 // @Security     sessionAuth
 // @Success      302  {string}  string  "Redirect to home page"
+// @Failure      500  {string}  string  "Internal Server Error"
 // @Router       /api/logout [post]
 func APILogoutHandler(w http.ResponseWriter, r *http.Request) {
 	sess, err := sessionStore.Get(r, "session")
