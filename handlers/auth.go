@@ -21,26 +21,30 @@ type User struct {
 	Password string
 }
 
-// APILoginHandler handles user login requests.
-// It validates the incoming form, checks the database for a matching user,
-// and verifies the password using bcrypt.
+// APILoginHandler authenticates a user and starts a cookie-based session.
+//
+// Behavior:
+// - Expects form fields: username, password (application/x-www-form-urlencoded).
+// - On success: stores the authenticated user_id in the "session" cookie and redirects to "/" (302).
+// - On failure (bad form / bad credentials): renders the login page with an error and returns 200.
+// - Avoids username enumeration by not distinguishing between "unknown user" and "wrong password".
 //
 // APILoginHandler godoc
 // @Summary      User login
-// @Description  Authenticate a user and start a session.
+// @Description  Authenticate a user and start a session. On failure, renders the login page (HTTP 200) with an error message.
 // @Tags         Auth
 // @Accept       application/x-www-form-urlencoded
 // @Produce      html
 // @Param        username  formData  string  true   "Username"
 // @Param        password  formData  string  true   "Password"
 // @Success      302  {string}  string  "Redirect to home page"
-// @Failure      200  {string}  string  "Rendered login form with errors"
+// @Success      200  {string}  string  "Rendered login form with errors"
 // @Router       /api/login [post]
 func APILoginHandler(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		renderTemplate(w, r, "login", map[string]any{
 			"Title": loginTitle,
-			"error": "Bad request",
+			"Error": "Bad request",
 		})
 		return
 	}
@@ -60,8 +64,8 @@ func APILoginHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil || bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(password)) != nil {
 		renderTemplate(w, r, "login", map[string]any{
 			"Title":    loginTitle,
-			"error":    "Invalid username or password",
-			"username": username,
+			"Error":    "Invalid username or password",
+			"Username": username,
 		})
 		return
 	}
@@ -72,8 +76,8 @@ func APILoginHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("sessionStore.Get error (login): %v", err)
 		renderTemplate(w, r, "login", map[string]any{
 			"Title":    loginTitle,
-			"error":    "Internal server error",
-			"username": username,
+			"Error":    "Internal server error",
+			"Username": username,
 		})
 		return
 	}
@@ -83,8 +87,8 @@ func APILoginHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("sess.Save error (login): %v", err)
 		renderTemplate(w, r, "login", map[string]any{
 			"Title":    loginTitle,
-			"error":    "Internal server error",
-			"username": username,
+			"Error":    "Internal server error",
+			"Username": username,
 		})
 		return
 	}
@@ -92,13 +96,16 @@ func APILoginHandler(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/", http.StatusFound)
 }
 
-// APIRegisterHandler handles new user registration.
-// It validates input, checks for existing usernames, hashes the password,
-// and inserts the user into PostgreSQL.
+// APIRegisterHandler creates a new user account.
+//
+// Behavior:
+// - Expects form fields: username, email, password, password2 (application/x-www-form-urlencoded).
+// - On success: inserts the user (bcrypt password hash) and redirects to "/login" (302).
+// - On validation / DB errors: renders the register page with an error and returns 200.
 //
 // APIRegisterHandler godoc
 // @Summary      Register user
-// @Description  Create a new user account.
+// @Description  Create a new user account. On validation errors, renders the register page (HTTP 200) with an error message.
 // @Tags         Auth
 // @Accept       application/x-www-form-urlencoded
 // @Produce      html
@@ -107,13 +114,13 @@ func APILoginHandler(w http.ResponseWriter, r *http.Request) {
 // @Param        password   formData  string  true   "Password"
 // @Param        password2  formData  string  true   "Password confirmation"
 // @Success      302  {string}  string  "Redirect to login page"
-// @Failure      200  {string}  string  "Rendered register form with errors"
+// @Success      200  {string}  string  "Rendered register form with errors"
 // @Router       /api/register [post]
 func APIRegisterHandler(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		renderTemplate(w, r, "register", map[string]any{
 			"Title": registerTitle,
-			"error": "Bad request",
+			"Error": "Bad request",
 		})
 		return
 	}
@@ -127,7 +134,7 @@ func APIRegisterHandler(w http.ResponseWriter, r *http.Request) {
 	if username == "" || email == "" || pw1 == "" {
 		renderTemplate(w, r, "register", map[string]any{
 			"Title": registerTitle,
-			"error": "All fields required",
+			"Error": "All fields required",
 		})
 		return
 	}
@@ -136,7 +143,7 @@ func APIRegisterHandler(w http.ResponseWriter, r *http.Request) {
 	if pw1 != pw2 {
 		renderTemplate(w, r, "register", map[string]any{
 			"Title": registerTitle,
-			"error": "Passwords do not match",
+			"Error": "Passwords do not match",
 		})
 		return
 	}
@@ -151,7 +158,7 @@ func APIRegisterHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("register exists query error: %v", err)
 		renderTemplate(w, r, "register", map[string]any{
 			"Title": registerTitle,
-			"error": "Database error",
+			"Error": "Database error",
 		})
 		return
 	}
@@ -159,7 +166,7 @@ func APIRegisterHandler(w http.ResponseWriter, r *http.Request) {
 	if exists > 0 {
 		renderTemplate(w, r, "register", map[string]any{
 			"Title": registerTitle,
-			"error": "Username already in use",
+			"Error": "Username already in use",
 		})
 		return
 	}
@@ -170,7 +177,7 @@ func APIRegisterHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("bcrypt.GenerateFromPassword error: %v", err)
 		renderTemplate(w, r, "register", map[string]any{
 			"Title": registerTitle,
-			"error": "Internal error, please try again",
+			"Error": "Internal error, please try again",
 		})
 		return
 	}
@@ -184,7 +191,7 @@ func APIRegisterHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("register insert error: %v", err)
 		renderTemplate(w, r, "register", map[string]any{
 			"Title": registerTitle,
-			"error": "Registration failed",
+			"Error": "Registration failed",
 		})
 		return
 	}
@@ -193,7 +200,12 @@ func APIRegisterHandler(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/login", http.StatusFound)
 }
 
-// APILogoutHandler logs out the user by removing the session value.
+// APILogoutHandler clears the current user's session and redirects home.
+//
+// Notes:
+// - If the user is not logged in, sessionStore.Get typically returns an empty session;
+//   the handler still redirects home after attempting to clear "user_id".
+// - Intended to be POST-only to avoid side effects on GET.
 //
 // APILogoutHandler godoc
 // @Summary      Logout user
@@ -202,7 +214,8 @@ func APIRegisterHandler(w http.ResponseWriter, r *http.Request) {
 // @Produce      html
 // @Security     sessionAuth
 // @Success      302  {string}  string  "Redirect to home page"
-// @Router       /api/logout [get]
+// @Failure      500  {string}  string  "Internal Server Error"
+// @Router       /api/logout [post]
 func APILogoutHandler(w http.ResponseWriter, r *http.Request) {
 	sess, err := sessionStore.Get(r, "session")
 	if err != nil {

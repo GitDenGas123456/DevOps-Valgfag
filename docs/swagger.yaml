@@ -52,7 +52,8 @@ definitions:
     type: object
 info:
   contact: {}
-  description: HTTP API for the WhoKnows application, providing authentication, search, and weather services.
+  description: 'API for the WhoKnows web app: session auth, search content, weather
+    forecast, and health/readiness probes.'
   title: WhoKnows API
   version: 0.1.0
 paths:
@@ -60,7 +61,8 @@ paths:
     post:
       consumes:
       - application/x-www-form-urlencoded
-      description: Authenticate a user and start a session.
+      description: Authenticate a user and start a session. On failure, renders the
+        login page (HTTP 200) with an error message.
       parameters:
       - description: Username
         in: formData
@@ -87,8 +89,13 @@ paths:
       tags:
       - Auth
   /api/logout:
-    get:
+    post:
       description: Clear the user session and redirect home.
+      parameters:
+      - description: session cookie (session=...)
+        in: header
+        name: Cookie
+        type: string
       produces:
       - text/html
       responses:
@@ -105,7 +112,8 @@ paths:
     post:
       consumes:
       - application/x-www-form-urlencoded
-      description: Create a new user account.
+      description: Create a new user account. On validation errors, renders the register
+        page (HTTP 200) with an error message.
       parameters:
       - description: Username
         in: formData
@@ -170,16 +178,16 @@ paths:
       - application/json
       responses:
         "200":
-          description: Forecast retrieved
+          description: OK
           schema:
             $ref: '#/definitions/handlers.WeatherAPIResponse'
         "503":
-          description: Weather service unavailable
+          description: Service Unavailable
           schema:
             $ref: '#/definitions/handlers.APIErrorResponse'
       summary: Get weather forecast
       tags:
-      - API
+      - Weather
   /healthz:
     get:
       description: Returns ok when the service is running.

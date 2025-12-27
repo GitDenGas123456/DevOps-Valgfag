@@ -1,202 +1,231 @@
-# WhoKnows (Go) - DevOps Elective Project
+# WhoKnows (Go) - DevOps Valgfag Project
 
-A lightweight Go web application with:
-
-- Pages: search / about / login / register / weather
-- Session-based authentication (SQLite + cookies)
-- Search with optional FTS5 and external Wikipedia enrichment
-- Observability via Prometheus + Grafana
-- Full CI/CD (lint, tests, migrations, smoke, deploy)
+WhoKnows is a lightweight Go web application built for the DevOps Valgfag course. It demonstrates end-to-end DevOps practices with production parity, automation, and operational correctness.
 
 ---
 
-## Quick Start
+## Features
 
-### Requirements
+- Web pages: search, about, login, register, weather
+- Session-based authentication (gorilla/sessions + PostgreSQL)
+- Search with optional Full-Text Search (FTS) and optional external enrichment
+- Weather data via the DMI API
+- Observability with Prometheus and Grafana
+- Health and readiness probes (`/healthz`, `/readyz`)
+- OpenAPI / Swagger documentation
+- Automated CI/CD (linting, testing, smoke tests, container build, deployment)
 
-- Go 1.25+
-- Docker (for `docker compose`)
-- `sqlite3` CLI (optional)
+---
 
-### Run locally
+## Quick Start (Docker Compose - recommended)
 
-Creates the SQLite DB automatically if missing:
+Run via Docker Compose to mirror CI and production.
 
-```bash
-SEED_ON_BOOT=1 PORT=8080 go run ./cmd/server
-```
-
-DB path:
-
-```text
-data/seed/whoknows.db
-```
-
-### Run with Docker Compose
-
-Uses the published image from GHCR:
+1. Install Docker with the Compose plugin.
+2. Copy the example env file and fill required values:
 
 ```bash
-docker compose up -d
+cp .env.example .env
 ```
 
-Exposes:
+Required for Compose:
+
+- `APP_IMAGE_TAG` (e.g. `latest` or a commit SHA)
+- `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`
+- `SESSION_KEY` (32+ bytes in prod)
+- `DMI_API_KEY`
+- `GF_SECURITY_ADMIN_USER`, `GF_SECURITY_ADMIN_PASSWORD`
+- `GF_SERVER_DOMAIN` (use `localhost` for local dev)
+
+Start the stack:
+
+```bash
+docker compose up --build
+```
+
+Stop the stack:
+
+```bash
+docker compose down
+```
+
+Exposed locally:
 
 - App: http://localhost:8080
-- Prometheus: http://localhost:9090
-- Grafana: http://localhost:3000
+- Swagger UI: http://localhost:8080/swagger/index.html
+- Grafana: http://localhost:3000/grafana/ (served under a subpath)
 
-### Build your own image
-
-```bash
-docker build -t whoknows-app:local .
-docker run -p 8080:8080 -v ${PWD}/data:/app/data whoknows-app:local
-```
+More run/deploy options are in `docs/How-to-run-the-server.md`.
 
 ---
 
-## Configuration (Environment Variables)
+## Running without Compose (advanced)
 
-| Variable          | Description                                                  |
-| ----------------- | ------------------------------------------------------------ |
-| `PORT`            | HTTP port (default: `8080`)                                  |
-| `DATABASE_PATH`   | SQLite path (e.g. `data/seed/whoknows.db`)                   |
-| `SEED_ON_BOOT`    | `1` = seed DB automatically if tables are missing            |
-| `SESSION_KEY`     | 64-byte secret for secure sessions                           |
-| `SEARCH_FTS`      | `1` to enable FTS5 search (requires migration `0003`)        |
-| `APP_ENV`         | Set to `prod` in production to disable dev admin seeding     |
-| `WIKI_USER_AGENT` | Optional custom User-Agent for Wikipedia API                 |
-| `DMI_API_KEY`     | API key for the weather page                                 |
+You can run the Go binary or a standalone container against an existing PostgreSQL instance. Provide either `DB_HOST` with `POSTGRES_*` vars or a full `DATABASE_URL`. See `docs/How-to-run-the-server.md` for commands and caveats.
 
 ---
 
-## Data and Migrations
+## Configuration
 
-- SQL migrations live in `migrations/`.
-- Run with `make`:
+### Core runtime
 
-  ```bash
-  DATABASE_PATH=data/seed/whoknows.db make migrate
-  ```
+| Variable | Description |
+| --- | --- |
+| `PORT` | HTTP port (default `8080`) |
+| `APP_ENV` | `dev` or `prod` (Compose sets `prod`) |
+| `SESSION_KEY` | Secret used to sign session cookies (**32+ bytes in prod**) |
+| `APP_IMAGE_TAG` | Docker image tag used by Compose |
+| `DATABASE_URL` | Full PostgreSQL DSN (preferred for managed DBs/CI) |
+| `DB_HOST` | DB host when composing a DSN from individual vars |
+| `POSTGRES_USER` | DB user (default `devops`) |
+| `POSTGRES_PASSWORD` | DB password |
+| `POSTGRES_DB` | DB name (default `whoknows`) |
+| `POSTGRES_PORT` | DB port (default `5432`) |
+| `POSTGRES_SSLMODE` | TLS mode for Postgres (default `disable`; use `require`/`verify-full` in prod) |
+| `DB_MAX_OPEN_CONNS` | Max open DB connections (default `10`) |
+| `DB_MAX_IDLE_CONNS` | Max idle DB connections (default `10`) |
+| `DB_CONN_MAX_LIFETIME` | Connection lifetime (default `30m`) |
 
-- Or via script:
+### Feature toggles
 
-  ```bash
-  scripts/migrate.sh data/seed/whoknows.db
-  ```
+| Variable | Description |
+| --- | --- |
+| `SEARCH_FTS` | Enable Full-Text Search (`1` to enable) |
+| `EXTERNAL_SEARCH` | Enable external search enrichment (`1` to enable) |
+| `WIKI_USER_AGENT` | User-Agent used for Wikipedia scraping |
 
-Notes:
+### Weather (DMI)
 
-- Seeding runs automatically if `users` is missing or `SEED_ON_BOOT=1`.
-- `migrations/0003_pages_fts.sql` creates the `pages_fts` virtual table used when `SEARCH_FTS=1`.
+| Variable | Description |
+| --- | --- |
+| `DMI_API_KEY` | Required API key for weather endpoint |
+| `DMI_API_URL` | Override base URL (defaults to `https://dmigw.govcloud.dk`) |
+| `DMI_HTTP_TIMEOUT` | HTTP timeout for the DMI client (default `20s`) |
+
+### Grafana / monitoring
+
+| Variable | Description |
+| --- | --- |
+| `GF_SECURITY_ADMIN_USER` | Grafana admin user (required by Compose) |
+| `GF_SECURITY_ADMIN_PASSWORD` | Grafana admin password (required by Compose) |
+| `GF_SERVER_DOMAIN` | Grafana domain; set to `localhost` for local dev |
 
 ---
 
-## API and Routes
+## Database and migrations
+
+- PostgreSQL is used at runtime; migrations run automatically on startup.
+- Migration logic: `internal/migrate`
+- SQL files: `migrations/`
+
+---
+
+## API and routes
 
 ### Pages
 
-- `/` - Search
+- `/` - search
 - `/about`
 - `/login`
 - `/register`
 - `/weather`
 
-### API
+### API endpoints
 
 - `POST /api/register`
 - `POST /api/login`
-- `POST /api/logout` / `GET /api/logout`
+- `POST /api/logout` (POST only)
 - `GET /api/search?q=<term>&language=<en|da>`
+- `GET /api/weather`
 
-### Observability
+### Observability and diagnostics
 
-- `GET /healthz`
-- `GET /metrics` (Prometheus)
-- `GET /swagger/index.html`
-
-Key metrics:
-
-- `app_search_total`
-- `app_search_with_result_total`
-- `app_search_duration_seconds`
+- `GET /healthz` - liveness
+- `GET /readyz` - readiness (checks DB)
+- `GET /metrics` - Prometheus metrics
+- `GET /swagger/index.html` - Swagger UI
 
 ---
 
-## Observability Stack
+## Swagger / OpenAPI
 
-### Prometheus
+Generated with `swaggo/swag`.
 
-Configured in `monitoring/prometheus/prometheus.yml`, scraping:
+Regenerate:
 
-- `whoknows-app:8080`
-- `node_exporter:9100`
+```bash
+swag init -g cmd/server/main.go -o docs
+```
 
-### Grafana
+Generated files:
 
-Dashboard provisioned from `monitoring/grafana/search-monitoring-dashboard.json`.
+- `docs/swagger.json`
+- `docs/swagger.yaml`
+- `docs/docs.go` (auto-generated; do not edit)
 
-Default login credentials for Grafana are set via environment variables in your Docker Compose configuration.
-
-For development/demo, you can set credentials in a `.env` file or via environment variables:
-
-```env
-GF_SECURITY_ADMIN_USER=yourusername
-GF_SECURITY_ADMIN_PASSWORD=yourpassword
 ---
 
-## Development, Testing and CI
+## Postman QA collection
 
-### Tests
+`postman/WhoKnows.postman_collection.json`
+
+`BASE_URL` defaults to `http://localhost:8080`; override for staging/production.
+
+---
+
+## Testing
 
 ```bash
 go test ./...
 ```
 
-### Full local check (if `make` is available)
-
-```bash
-make check
-```
-
-Includes:
-
-- `go fmt`, `go vet`, `golangci-lint`
-- Race + coverage tests
-- Local build
-- Smoke tests
-- Docker build
-
-### CI
-
-`.github/workflows/ci.yml` runs:
-
-- `go vet`, `golangci-lint`, `go test ./...`
-- Migrations sanity-check
-- `/healthz` smoke test
-- Dockerfile lint
-- Build and push to GHCR
-- SSH deploy on `main`
+- Tests run against in-memory SQLite for speed; no local Postgres is required for unit/integration tests.
+- Runtime still uses PostgreSQL.
 
 ---
 
-## Repository Structure (overview)
+## CI/CD
+
+GitHub Actions workflow: `.github/workflows/ci.yml`
+
+- Triggers: `push` to `main`/`develop` and `pull_request` targeting `main`/`develop`
+- Concurrency: `ci-${{ github.ref }}` with cancel-in-progress
+
+Jobs:
+
+- `build`: Go 1.24.x, Postgres service, `go vet`, `golangci-lint`, `go test -race` with coverage upload
+- `hadolint`: Dockerfile lint
+- `healthz`: build binary, run against Postgres service, execute `scripts/smoke.sh`
+- `compose-integration`: build image tagged with SHA, write `.env`, `docker compose up` app+db, wait for `/readyz`, run smoke, tear down
+- `docker-build`: on `main`, build and push `ghcr.io/gitdengas123456/devops-valgfag:latest`
+- `deploy`: on `main`, SSH to VM, write locked-down `.env`, `docker compose pull && up -d`
+
+CI note: the Postgres DSN uses `sslmode=disable` because the database runs inside the GitHub Actions network. Enable TLS (`require`/`verify-full`) in production deployments.
+
+---
+
+## Repository structure
 
 ```text
-.github/           CI workflows, PR/issue templates
-cmd/server/        Application bootstrap + router
-handlers/          Page, auth, search, weather, health handlers
-internal/db/       Schema, migrations, seeding helpers
-internal/metrics/  Prometheus metrics (counters, histograms)
-internal/scraper/  Wikipedia scraper
-templates/         HTML templates
-static/            CSS and assets
-data/              Seeded SQLite DB
-migrations/        SQL migrations
-monitoring/        Prometheus and Grafana config
-scripts/           Local helper scripts
-tests/             Handler and integration tests
-docs/              Swagger and course notes
-rewrite/           Experiments
-src/backend/       Older prototype templates
+.github/            CI workflows
+cmd/server/         Application entrypoint and router
+handlers/           HTTP handlers
+internal/           Shared packages (metrics, migrate, scraper, etc.)
+migrations/         SQL migration files
+monitoring/         Prometheus and Grafana configuration
+postman/            Postman QA collection
+templates/          HTML templates
+static/             CSS / JS / assets
+docs/               Swagger and runbook
+scripts/            Helper scripts
+tests/              Unit and integration tests (SQLite)
 ```
+
+---
+
+## Notes
+
+- `SESSION_KEY` must be strong in production.
+- Docker Compose sets `APP_ENV=prod` by default.
+- Ensure port 8080 is open when deploying to a VM.
+- Never commit real secrets to git.

@@ -3,6 +3,9 @@
 // @description API for the WhoKnows web app: session auth, search content, weather forecast, and health/readiness probes.
 // @BasePath /
 
+// @securityDefinitions.apikey sessionAuth
+// @in header
+// @name Cookie
 package main
 
 import (
@@ -31,8 +34,7 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
-// User represents an application user
-// @Description Application user with login credentials
+// User represents an application user with login credentials.
 type User struct {
 	ID       int    `json:"id" example:"1"`
 	Username string `json:"username" example:"alice"`
@@ -57,34 +59,39 @@ type AuthResponse struct {
 	Message    string `json:"message" example:"Login successful"`
 }
 
+// dsnMeta is safe-to-log info about the DB connection (no password).
 type dsnMeta struct {
-	Source string
+	Source string // DB_HOST / DATABASE_URL / default
 	Host   string
 	DB     string
 	User   string
 }
 
 func main() {
-	// HTTP port
+
+	// -------------------------
+	// Runtime config
+	// -------------------------
+
+	// PORT: which TCP port the HTTP server listens on (default 8080).
 	port := getenv("PORT", "8080")
 
-	// Env
+	// APP_ENV: used to toggle "prod" behavior (e.g. safer logging).
 	appEnv := getenv("APP_ENV", "dev")
 
-	// Resolve DSN with precedence:
-	// 1) DB_HOST + POSTGRES_* (Docker/VM)
-	// 2) DATABASE_URL
-	// 3) default postgres_db
+	// DSN = "Data Source Name" = connection string used by sql.Open().
+	// meta = non-sensitive info we can safely log for debugging.
 	dsn, meta := resolvePostgresDSN()
 
-	// Log DSN metadata safely
+	// In prod we log LESS to avoid leaking details (even if it's "only" username).
 	if appEnv != "prod" {
 		log.Printf("Using PostgreSQL DSN (source=%s host=%s db=%s user=%s)", meta.Source, meta.Host, meta.DB, meta.User)
 	} else {
 		log.Printf("Using PostgreSQL DSN (source=%s host=%s db=%s)", meta.Source, meta.Host, meta.DB)
 	}
 
-	// Session key + feature toggles
+	// SESSION_KEY is used by gorilla/sessions to sign (and possibly encrypt) cookies.
+	// If it is weak, sessions can be forged. That's why we enforce 32+ bytes in prod.
 	sessionKey := getenv("SESSION_KEY", "")
 	if sessionKey == "" {
 		log.Fatal("SESSION_KEY is required")
@@ -94,14 +101,20 @@ func main() {
 		log.Fatal("SESSION_KEY must be at least 32 bytes (not characters) in prod")
 	}
 
+	// Feature toggles
 	useFTS := getenv("SEARCH_FTS", "0") == "1"
 	externalSearchEnabled := getenv("EXTERNAL_SEARCH", "1") == "1"
+
+	// -------------------------
+	// Database
+	// -------------------------
 
 	// Open PostgreSQL using the pgx driver
 	db, err := sql.Open("pgx", dsn)
 	if err != nil {
 		log.Fatal(err)
 	}
+	// Ensure DB is closed on main() exit
 	defer func() {
 		if cerr := db.Close(); cerr != nil {
 			log.Printf("error closing DB: %v", cerr)
@@ -125,6 +138,10 @@ func main() {
 	}
 	log.Println("Connected to PostgreSQL and migrations applied successfully!")
 
+	// -------------------------
+	// HTTP (templates, sessions, router)
+	// -------------------------
+
 	// Templates
 	funcs := template.FuncMap{
 		"now":  time.Now,
@@ -132,10 +149,14 @@ func main() {
 	}
 	tmpl := template.Must(template.New("").Funcs(funcs).ParseGlob("./templates/*.html"))
 
-	// Session cookies
+	// Session store backed by secure cookies.
+	// The sessionKey is used to sign cookies so clients cannot tamper with them.
 	sessionStore := sessions.NewCookieStore([]byte(sessionKey))
 
-	// Wire handlers
+	// "Wire handlers" = give handlers access to shared dependencies:
+	// - db connection
+	// - parsed HTML templates
+	// - session store
 	h.Init(db, tmpl, sessionStore)
 	h.EnableFTSSearch(useFTS)
 	h.EnableExternalSearch(externalSearchEnabled)
@@ -146,38 +167,57 @@ func main() {
 	// Metrics middleware
 	r.Use(metrics.RequestMetricsMiddleware())
 
-	// Static files
+	// Routes
+	// - Static assets
+	// - Pages
+	// - API
+	// - Health/metrics
+	// - Swagger
 	fs := http.FileServer(http.Dir("static"))
 	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", fs))
 
-	// Page endpoints
-	r.HandleFunc("/", h.HomePageHandler).Methods(http.MethodGet)
-	r.HandleFunc("/about", h.AboutPageHandler).Methods(http.MethodGet)
-	r.HandleFunc("/login", h.LoginPageHandler).Methods(http.MethodGet)
-	r.HandleFunc("/register", h.RegisterPageHandler).Methods(http.MethodGet)
-	r.HandleFunc("/weather", h.WeatherPageHandler).Methods(http.MethodGet)
-	r.HandleFunc("/search", h.SearchPageHandler).Methods(http.MethodGet)
+	r.HandleFunc("/", h.HomePageHandler).Methods(http.MethodGet, http.MethodHead)
+	r.HandleFunc("/about", h.AboutPageHandler).Methods(http.MethodGet, http.MethodHead)
+	r.HandleFunc("/login", h.LoginPageHandler).Methods(http.MethodGet, http.MethodHead)
+	r.HandleFunc("/register", h.RegisterPageHandler).Methods(http.MethodGet, http.MethodHead)
+	r.HandleFunc("/weather", h.WeatherPageHandler).Methods(http.MethodGet, http.MethodHead)
+	r.HandleFunc("/search", h.SearchPageHandler).Methods(http.MethodGet, http.MethodHead)
 
-	// API endpoints
 	r.HandleFunc("/api/login", h.APILoginHandler).Methods(http.MethodPost)
 	r.HandleFunc("/api/register", h.APIRegisterHandler).Methods(http.MethodPost)
-	r.HandleFunc("/api/logout", h.APILogoutHandler).Methods(http.MethodPost, http.MethodGet)
-	// Search is GET-only in swagger + handler
+	r.HandleFunc("/api/logout", h.APILogoutHandler).Methods(http.MethodPost)
+
 	r.HandleFunc("/api/search", h.APISearchHandler).Methods(http.MethodGet)
-	// Weather JSON API
+
 	r.HandleFunc("/api/weather", h.APIWeatherHandler).Methods(http.MethodGet)
 
-	// Health / readiness
-	r.HandleFunc("/healthz", h.Healthz).Methods(http.MethodGet)
-	r.HandleFunc("/readyz", h.Readyz).Methods(http.MethodGet)
+	r.HandleFunc("/healthz", h.Healthz).Methods(http.MethodGet, http.MethodHead)
+	r.HandleFunc("/readyz", h.Readyz).Methods(http.MethodGet, http.MethodHead)
 
-	// Metrics endpoint
 	r.Handle("/metrics", promhttp.Handler())
 
-	// Swagger
-	r.PathPrefix("/swagger/").Handler(httpSwagger.WrapHandler)
+	swaggerHandler := httpSwagger.WrapHandler
+	// Support both /swagger and /swagger/index.html (avoids 404 without trailing slash).
+	r.HandleFunc("/swagger", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/swagger/index.html", http.StatusFound)
+	}).Methods(http.MethodGet, http.MethodHead)
+	
+	r.PathPrefix("/swagger/").Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodHead {
+			r2 := r.Clone(r.Context())
+			r2.Method = http.MethodGet
+			swaggerHandler.ServeHTTP(w, r2)
+			return
+		}
+		swaggerHandler.ServeHTTP(w, r)
+	})).Methods(http.MethodGet, http.MethodHead)
 
-	// Start server (with timeouts)
+	// -------------------------
+	// Server
+	// -------------------------
+
+	// http.Server lets us configure timeouts (recommended in production).
+	// Handler: r means "use the mux router to handle every incoming request".
 	srv := &http.Server{
 		Addr:              ":" + port,
 		Handler:           r,
@@ -191,11 +231,23 @@ func main() {
 	log.Fatal(srv.ListenAndServe())
 }
 
+// resolvePostgresDSN determines how the application should connect to PostgreSQL.
+// Precedence:
+// 1) DB_HOST + POSTGRES_* env vars (Docker / VM / local compose)
+// 2) DATABASE_URL (CI / cloud / managed databases)
+// 3) Fallback to docker-compose default service name
+//
+// It returns:
+// - a full DSN string used to open the DB connection
+// - safe-to-log metadata describing the chosen configuration
 func resolvePostgresDSN() (string, dsnMeta) {
+
+	// Case 1: Running in Docker / VM where DB host is provided explicitly
 	if host := os.Getenv("DB_HOST"); host != "" {
 		return buildPostgresDSN(host, "DB_HOST")
 	}
 
+	// Case 2: Running in CI/cloud where a full DATABASE_URL is injected (e.g. GitHub Actions env).
 	if dsn := os.Getenv("DATABASE_URL"); dsn != "" {
 		meta, err := extractDSNMeta(dsn)
 		if err != nil {
@@ -205,10 +257,12 @@ func resolvePostgresDSN() (string, dsnMeta) {
 		return dsn, meta
 	}
 
-	// default for docker-compose
+	// Case 3: Local docker-compose fallback (service name resolution)
 	return buildPostgresDSN("postgres_db", "default")
 }
 
+// buildPostgresDSN constructs a PostgreSQL connection string from individual environment variables.
+// This is used when the environment does NOT provide a full DATABASE_URL.
 func buildPostgresDSN(host, source string) (string, dsnMeta) {
 	port := getenv("POSTGRES_PORT", "5432")
 	user := getenv("POSTGRES_USER", "devops")

@@ -17,7 +17,7 @@ const docTemplate = `{
     "paths": {
         "/api/login": {
             "post": {
-                "description": "Authenticate a user and start a session.",
+                "description": "Authenticate a user and start a session. On failure, renders the login page (HTTP 200) with an error message.",
                 "consumes": [
                     "application/x-www-form-urlencoded"
                 ],
@@ -61,7 +61,7 @@ const docTemplate = `{
             }
         },
         "/api/logout": {
-            "get": {
+            "post": {
                 "security": [
                     {
                         "sessionAuth": []
@@ -75,6 +75,14 @@ const docTemplate = `{
                     "Auth"
                 ],
                 "summary": "Logout user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "session cookie (session=...)",
+                        "name": "Cookie",
+                        "in": "header"
+                    }
+                ],
                 "responses": {
                     "302": {
                         "description": "Redirect to home page",
@@ -87,7 +95,7 @@ const docTemplate = `{
         },
         "/api/register": {
             "post": {
-                "description": "Create a new user account.",
+                "description": "Create a new user account. On validation errors, renders the register page (HTTP 200) with an error message.",
                 "consumes": [
                     "application/x-www-form-urlencoded"
                 ],
@@ -185,18 +193,18 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "API"
+                    "Weather"
                 ],
                 "summary": "Get weather forecast",
                 "responses": {
                     "200": {
-                        "description": "Forecast retrieved",
+                        "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/handlers.WeatherAPIResponse"
                         }
                     },
                     "503": {
-                        "description": "Weather service unavailable",
+                        "description": "Service Unavailable",
                         "schema": {
                             "$ref": "#/definitions/handlers.APIErrorResponse"
                         }
@@ -353,7 +361,7 @@ var SwaggerInfo = &swag.Spec{
 	BasePath:         "/",
 	Schemes:          []string{},
 	Title:            "WhoKnows API",
-	Description:      "Application user with login credentials",
+	Description:      "API for the WhoKnows web app: session auth, search content, weather forecast, and health/readiness probes.",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",
