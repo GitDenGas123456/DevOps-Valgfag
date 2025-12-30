@@ -1,4 +1,4 @@
--- 9998_parser_edgecases.sql
+-- 9999_parser_edgecases.sql
 -- Parser edge cases smoke test
 -- Only to validate splitSQLStatements() handles tricky Postgres syntax.
 
