@@ -325,4 +325,5 @@ jobs:
 
             docker compose pull
             docker compose up -d --remove-orphans
+            docker compose restart grafana
             docker image prune -f
