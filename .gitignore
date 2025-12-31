@@ -16,8 +16,5 @@ legacy
 # sqlite seed
 /data/seed/*.db
 
-# sqlite seed
-/data/seed/*.db
-
-
+# Environment variables
 .env
