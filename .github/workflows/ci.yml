@@ -262,6 +262,9 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v4
 
@@ -363,11 +366,14 @@ jobs:
             docker compose pull
 
             # Start everything EXCEPT grafana (avoid starting it twice)
-            docker compose up -d --remove-orphans $(docker compose config --services | grep -v grafana)
+            NON_GRAFANA_SERVICES="$(docker compose config --services | grep -v '^grafana$' || true)"
+            if [ -n "$NON_GRAFANA_SERVICES" ]; then
+              docker compose up -d --remove-orphans $NON_GRAFANA_SERVICES
+            fi
             
             # Recreate grafana once so provisioning reloads dashboards from JSON
             docker compose up -d --force-recreate grafana
-
+            
             # Wait until grafana container is running before exec (avoid flaky deploys)
             echo "Waiting for Grafana container..."
             for i in $(seq 1 30); do
@@ -376,7 +382,14 @@ jobs:
               fi
               sleep 2
             done
-
+            
+            # After waiting, ensure Grafana actually reached Running state
+            if ! docker inspect -f '{{.State.Running}}' grafana 2>/dev/null | grep -q true; then
+              echo "ERROR: Grafana did not reach Running state in time" >&2
+              docker logs grafana || true
+              exit 1
+            fi
+            
             echo "Dashboard file checksum inside Grafana container:"
             docker exec grafana sha256sum /var/lib/grafana/dashboards/search-monitoring-dashboard.json || true
 
