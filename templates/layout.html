@@ -11,10 +11,13 @@
   <header class="site-header">
     <nav class="nav container">
       <a class="brand" href="/">WhoKnows<span class="dot">?</span></a>
+
       <ul class="nav-links">
         <li><a class="nav-link" href="/search">Search</a></li>
+        <li><a class="nav-link" href="/weather">Weather</a></li>
         <li><a class="nav-link" href="/about">About</a></li>
         <li class="sep"></li>
+
         {{if .LoggedIn}}
           <li>
             <form action="/api/logout" method="POST" style="display:inline;">
@@ -42,9 +45,12 @@
       <div class="footer-left">
         <span class="footer-brand">WhoKnows? &copy; {{year}}</span>
       </div>
+
       <ul class="footer-links">
         <li><a href="/about">About</a></li>
         <li><a href="/search">Search</a></li>
+        <li><a href="/weather">Weather</a></li>
+
         {{if .LoggedIn}}
           <li>
             <form action="/api/logout" method="POST" style="display:inline;">
