@@ -311,10 +311,10 @@ jobs:
 
             cd "${DEPLOY_PATH}"
 
-            # Ensure the VM is exactly on the latest main
+            # Ensure the VM is exactly on the latest main (destructive by design: discards local changes in DEPLOY_PATH)
             git fetch origin main
             git reset --hard origin/main
-
+            
             # Write .env used by docker compose on the VM
             umask 077
             cat > .env <<EOF
@@ -330,24 +330,20 @@ jobs:
             APP_IMAGE_TAG=${APP_IMAGE_TAG}
             EOF
             chmod 600 .env
-
-            # Debug: checksum the dashboard JSON on the VM (verifies git updated the file)
+            
             echo "Dashboard file checksum on VM:"
             sha256sum monitoring/grafana/search-monitoring-dashboard.json || true
-
-            # Pull updated images (app image is now pinned by SHA tag)
+            
             docker compose pull
-
-            # Apply the stack (recreate if needed, keep volumes)
             docker compose up -d --remove-orphans
-
-            # Recreate ONLY the Grafana container
-            # This forces Grafana to restart cleanly and re-run provisioning
+            
+            # Recreate ONLY Grafana (keeps grafana-storage volume, forces provisioning reload)
             docker compose up -d --force-recreate grafana
-
-            # Debug: checksum the dashboard JSON as seen inside Grafana container
+            
+            # Give the container a moment to come up before exec
+            sleep 5
+            
             echo "Dashboard file checksum inside Grafana container:"
-            docker exec -i grafana sh -lc 'sha256sum /var/lib/grafana/dashboards/search-monitoring-dashboard.json || true'
-
-            # Cleanup
+            docker exec grafana sha256sum /var/lib/grafana/dashboards/search-monitoring-dashboard.json || true
+            
             docker image prune -f
