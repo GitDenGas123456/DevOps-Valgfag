@@ -361,9 +361,11 @@ jobs:
             sha256sum monitoring/grafana/search-monitoring-dashboard.json || true
 
             docker compose pull
-            docker compose up -d --remove-orphans
 
-            # Force grafana restart to guarantee provisioning reload (keeps grafana-storage volume)
+            # Start everything EXCEPT grafana (avoid starting it twice)
+            docker compose up -d --remove-orphans $(docker compose config --services | grep -v grafana)
+            
+            # Recreate grafana once so provisioning reloads dashboards from JSON
             docker compose up -d --force-recreate grafana
 
             # Wait until grafana container is running before exec (avoid flaky deploys)
@@ -379,3 +381,7 @@ jobs:
             docker exec grafana sha256sum /var/lib/grafana/dashboards/search-monitoring-dashboard.json || true
 
             docker image prune -f
+
+
+
+
