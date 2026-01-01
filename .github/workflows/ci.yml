@@ -11,10 +11,6 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
-# Default: least privilege for all jobs unless overridden
-permissions:
-  contents: read
-
 jobs:
   # -------------------------
   # Build + lint + tests (Go)
@@ -265,10 +261,6 @@ jobs:
     needs: [build, hadolint, healthz, compose-integration]
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-
-    permissions:
-      contents: read
-      packages: write
 
     steps:
       - uses: actions/checkout@v4
