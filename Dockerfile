@@ -20,17 +20,16 @@ WORKDIR /app
 
 RUN apk add --no-cache ca-certificates curl
 
-COPY --from=build /app/app .
+# App binary
+COPY --from=build /app/app ./app
 
+# Only runtime assets that the app actually reads from disk
 COPY --from=build /app/templates ./templates
 COPY --from=build /app/static ./static
-COPY --from=build /app/internal ./internal
-COPY --from=build /app/handlers ./handlers
 COPY --from=build /app/migrations ./migrations
 COPY --from=build /app/scripts ./scripts
 
 ENV PORT=8080
-
 EXPOSE 8080
 
 ENTRYPOINT ["./app"]

@@ -4,8 +4,10 @@ providers:
   - name: Search Monitoring
     uid: search-monitoring
     type: file
-    allowUiUpdates: false
+    orgId: 1
+    folder: ""
     disableDeletion: true
+    allowUiUpdates: false
     updateIntervalSeconds: 10
     options:
       path: /var/lib/grafana/dashboards
