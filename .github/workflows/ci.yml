@@ -6,13 +6,18 @@ on:
   pull_request:
     branches: [main, develop]
 
+# Avoid parallel runs on the same ref (multiple pushes to the same branch)
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   # -------------------------
-  # Build + lint + tests
+  # Build + lint + tests (Go)
+  #
+  # Purpose:
+  # - Compile + static checks + unit/integration tests against a real Postgres service
+  # - Produces coverage artifact that can be used for inspection.
   # -------------------------
   build:
     runs-on: ubuntu-latest
@@ -23,6 +28,7 @@ jobs:
       POSTGRES_DB: whoknows
 
     services:
+      # Local Postgres service for tests that expect DATABASE_URL
       postgres:
         image: postgres:16
         env:
@@ -52,14 +58,18 @@ jobs:
 
       - run: go version
       - run: go mod download
+
+      # Quick sanity checks
       - run: go vet ./...
 
+      # Lint (fast feedback on style/bugs)
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v8
         with:
           version: v2.1.6
           args: --timeout=5m ./...
 
+      # Unit + integration tests (race + coverage)
       - name: Run tests
         env:
           DATABASE_URL: postgres://devops:devops@localhost:5432/whoknows?sslmode=disable
@@ -76,7 +86,7 @@ jobs:
           path: coverage.out
 
   # -------------------------
-  # Dockerfile lint
+  # Dockerfile lint (Hadolint)
   # -------------------------
   hadolint:
     needs: build
@@ -86,10 +96,15 @@ jobs:
       - uses: hadolint/hadolint-action@v3.1.0
         with:
           dockerfile: Dockerfile
+          # Alpine: installing ca-certs/curl without pinning is acceptable for now
           ignore: DL3018
 
   # -------------------------
   # Health / smoke test (native binary)
+  #
+  # Purpose:
+  # - Runs the compiled server and validates /healthz + /readyz + smoke endpoints
+  # - Catches missing env-vars or runtime wiring problems early
   # -------------------------
   healthz:
     needs: build
@@ -156,13 +171,20 @@ jobs:
 
   # -------------------------
   # Compose-based integration (app + postgres_db)
+  #
+  # Purpose:
+  # - Validates docker-compose wiring, env_file behavior, and container health checks
+  # - Uses an image tagged with the committed SHA for determinism
   # -------------------------
   compose-integration:
     needs: build
     runs-on: ubuntu-latest
 
     env:
+      # Image tag used by docker-compose.yml (must be set)
       APP_IMAGE_TAG: ${{ github.sha }}
+
+      # Compose env vars
       POSTGRES_USER: devops
       POSTGRES_PASSWORD: devops
       POSTGRES_DB: whoknows
@@ -170,9 +192,12 @@ jobs:
       DMI_API_KEY: dummy-ci-key
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin
+
+      # Pinned monitoring images
       NODE_EXPORTER_IMAGE: prom/node-exporter:v1.10.2
       PROMETHEUS_IMAGE: prom/prometheus:v3.8.1
       GRAFANA_IMAGE: grafana/grafana:12.3.0
+
       APP_ENV: prod
 
     steps:
@@ -201,6 +226,7 @@ jobs:
           APP_ENV=${APP_ENV}
           EOF
 
+      # Bring up only whats needed for this CI job
       - name: Start only app + db
         run: docker compose up -d whoknows-app postgres_db
 
@@ -225,7 +251,11 @@ jobs:
         run: docker compose down -v
 
   # -------------------------
-  # Build & push Docker image
+  # Build & push Docker image (main only)
+  #
+  # Purpose:
+  # - Push both :latest and a :${{ github.sha }} tag
+  # - SHA tag enables reproducible deploys + easy rollback
   # -------------------------
   docker-build:
     needs: [build, hadolint, healthz, compose-integration]
@@ -235,11 +265,10 @@ jobs:
     permissions:
       contents: read
       packages: write
-
     steps:
       - uses: actions/checkout@v4
 
-      - name: Go module tidy (so Docker build won't fail)
+      - name: Go module tidy
         run: go mod tidy
 
       - uses: docker/login-action@v3
@@ -248,14 +277,22 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: docker/build-push-action@v6
+      - name: Build & push (latest + sha)
+        uses: docker/build-push-action@v6
         with:
           context: .
           push: true
-          tags: ghcr.io/gitdengas123456/devops-valgfag:latest
+          tags: |
+            ghcr.io/gitdengas123456/devops-valgfag:latest
+            ghcr.io/gitdengas123456/devops-valgfag:${{ github.sha }}
 
   # -------------------------
-  # Deploy to VM via SSH
+  # Deploy to VM via SSH (main only)
+  #
+  # Notes:
+  # - Uses immutable APP_IMAGE_TAG=${{ github.sha }} for reproducibility
+  # - Writes .env on the VM (never stored in git)
+  # - Resets repo to origin/main (destructive by design)
   # -------------------------
   deploy:
     needs: docker-build
@@ -268,24 +305,20 @@ jobs:
         uses: appleboy/ssh-action@v1.1.0
         env:
           DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
-
           POSTGRES_USER: ${{ vars.POSTGRES_USER }}
           POSTGRES_DB: ${{ vars.POSTGRES_DB }}
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-
           SESSION_KEY: ${{ secrets.SESSION_KEY }}
           DMI_API_KEY: ${{ secrets.DMI_API_KEY }}
-
           GF_SECURITY_ADMIN_USER: ${{ secrets.GF_SECURITY_ADMIN_USER }}
           GF_SECURITY_ADMIN_PASSWORD: ${{ secrets.GF_SECURITY_ADMIN_PASSWORD }}
-
-          APP_IMAGE_TAG: latest
-
+          APP_IMAGE_TAG: ${{ github.sha }}
         with:
           host: ${{ vars.PROD_SSH_HOST }}
           username: ${{ vars.PROD_SSH_USER }}
           key: ${{ secrets.PROD_SSH_KEY }}
           port: ${{ vars.PROD_SSH_PORT }}
+          fingerprint: ${{ secrets.PROD_SSH_FINGERPRINT }}
           envs: >-
             DEPLOY_PATH,
             POSTGRES_USER,POSTGRES_DB,POSTGRES_PASSWORD,
@@ -303,11 +336,15 @@ jobs:
             : "${DMI_API_KEY:?Missing DMI_API_KEY (secret)}"
             : "${GF_SECURITY_ADMIN_USER:?Missing GF_SECURITY_ADMIN_USER (secret)}"
             : "${GF_SECURITY_ADMIN_PASSWORD:?Missing GF_SECURITY_ADMIN_PASSWORD (secret)}"
+            : "${APP_IMAGE_TAG:?Missing APP_IMAGE_TAG}"
 
             cd "${DEPLOY_PATH}"
+
+            # Destructive by design - keeps VM in a known good git state
             git fetch origin main
             git reset --hard origin/main
 
+            # Generate .env for docker compose
             umask 077
             cat > .env <<EOF
             APP_ENV=prod
@@ -323,7 +360,37 @@ jobs:
             EOF
             chmod 600 .env
 
+            echo "Dashboard file checksum on VM:"
+            sha256sum monitoring/grafana/search-monitoring-dashboard.json || true
+
             docker compose pull
-            docker compose up -d --remove-orphans
-            docker compose restart grafana
+
+            # Start everything EXCEPT grafana (avoid starting it twice)
+            NON_GRAFANA_SERVICES="$(docker compose config --services | grep -v '^grafana$' || true)"
+            if [ -n "$NON_GRAFANA_SERVICES" ]; then
+              docker compose up -d --remove-orphans $NON_GRAFANA_SERVICES
+            fi
+            
+            # Recreate grafana once so provisioning reloads dashboards from JSON
+            docker compose up -d --force-recreate grafana
+            
+            # Wait until grafana container is running before exec (avoid flaky deploys)
+            echo "Waiting for Grafana container..."
+            for i in $(seq 1 30); do
+              if docker inspect -f '{{.State.Running}}' grafana 2>/dev/null | grep -q true; then
+                break
+              fi
+              sleep 2
+            done
+            
+            # After waiting, ensure Grafana actually reached Running state
+            if ! docker inspect -f '{{.State.Running}}' grafana 2>/dev/null | grep -q true; then
+              echo "ERROR: Grafana did not reach Running state in time" >&2
+              docker logs grafana || true
+              exit 1
+            fi
+            
+            echo "Dashboard file checksum inside Grafana container:"
+            docker exec grafana sha256sum /var/lib/grafana/dashboards/search-monitoring-dashboard.json || true
+
             docker image prune -f

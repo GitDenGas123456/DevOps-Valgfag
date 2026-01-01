@@ -1,10 +1,7 @@
 services:
   whoknows-app:
     build: .
-    # Note: we intentionally specify both `build` and `image`:
-    # - `build: .` builds the image locally from this directory.
-    # - `image: ghcr.io/gitdengas123456/devops-valgfag:${APP_IMAGE_TAG}` is the canonical name/tag.
-    image: ghcr.io/gitdengas123456/devops-valgfag:${APP_IMAGE_TAG:?set APP_IMAGE_TAG in .env (e.g. latest, v1.2.3 or commit SHA)}
+    image: ghcr.io/gitdengas123456/devops-valgfag:${APP_IMAGE_TAG:-latest}
     container_name: whoknows-app
     ports:
       - "8080:8080"
@@ -15,7 +12,7 @@ services:
       APP_ENV: "prod"
 
       # Feature flags
-      SEARCH_FTS: "0"
+      SEARCH_FTS: ${SEARCH_FTS:-1}
       EXTERNAL_SEARCH: ${EXTERNAL_SEARCH:-1}
       WIKI_USER_AGENT: ${WIKI_USER_AGENT:-devops-valgfag/1.0}
 
@@ -68,14 +65,15 @@ services:
     environment:
       DATA_SOURCE_NAME: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres_db:5432/${POSTGRES_DB}?sslmode=disable
     depends_on:
-      - postgres_db
+      postgres_db:
+        condition: service_healthy
     restart: unless-stopped
 
   node_exporter:
     image: ${NODE_EXPORTER_IMAGE:-prom/node-exporter:v1.8.2} # pin a version, avoid :latest
     container_name: node_exporter
     ports:
-      - "9100:9100"
+      - "127.0.0.1:9100:9100"
     command:
       - "--path.procfs=/host/proc"
       - "--path.sysfs=/host/sys"
@@ -97,20 +95,24 @@ services:
       - "--web.external-url=/prometheus"
       - "--web.route-prefix=/"
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
     volumes:
       - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
     depends_on:
-      - whoknows-app
-      - node_exporter
+      whoknows-app:
+        condition: service_healthy
+      node_exporter:
+        condition: service_started
+      postgres_exporter:
+        condition: service_started
     restart: unless-stopped
 
   grafana:
     image: ${GRAFANA_IMAGE:-grafana/grafana:12.3.0} # pin a version, avoid :latest
     container_name: grafana
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     env_file:
       - .env
     environment:
