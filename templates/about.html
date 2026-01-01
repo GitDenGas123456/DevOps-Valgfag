@@ -1,12 +1,36 @@
 {{define "about"}}
   {{template "header" .}}
+
   <section class="hero card">
     <h1>Our mission</h1>
     <p>We intend to build the world's best search engine!</p>
   </section>
+
+  <section class="card">
+    <h2>Quick links (Demo)</h2>
+
+    <div class="quick-links">
+      <a class="quick-link" href="/swagger/index.html">
+        <div class="ql-title">Swagger API docs</div>
+        <div class="ql-sub muted">Explore endpoints & schemas</div>
+      </a>
+
+      <a class="quick-link" href="/metrics">
+        <div class="ql-title">Metrics</div>
+        <div class="ql-sub muted">Prometheus scrape output</div>
+      </a>
+
+      <a class="quick-link" href="https://gitdengas.dk/grafana/" target="_blank" rel="noreferrer">
+        <div class="ql-title">Grafana</div>
+        <div class="ql-sub muted">Dashboards</div>
+      </a>
+    </div>
+  </section>
+
   <section class="card">
     <h2>Our team</h2>
     <img class="img-responsive" src="/static/monkgroup.png" alt="Our team">
   </section>
+
   {{template "footer" .}}
 {{end}}

@@ -8,6 +8,9 @@ import (
 	h "devops-valgfag/handlers"
 )
 
+// These tests validate page-level HTTP handlers in isolation.
+// Handlers are invoked directly (no router, no real server) to verify
+// correct status codes, redirects, and that a response body is rendered.
 func TestHomePageHandler_NoQuery_OK(t *testing.T) {
 	db := setupTestHandlers(t)
 	defer closeDB(t, db)
@@ -25,6 +28,8 @@ func TestHomePageHandler_NoQuery_OK(t *testing.T) {
 	}
 }
 
+// When the home page is requested with a search query,
+// the handler should redirect to the /search page with the same parameters.
 func TestHomePageHandler_WithQuery_Redirects(t *testing.T) {
 	db := setupTestHandlers(t)
 	defer closeDB(t, db)
@@ -42,6 +47,8 @@ func TestHomePageHandler_WithQuery_Redirects(t *testing.T) {
 	}
 }
 
+// The search page should render successfully even when no query is provided,
+// allowing the user to see an empty or initial search state.
 func TestSearchPageHandler_NoQuery_OK(t *testing.T) {
 	db := setupTestHandlers(t)
 	defer closeDB(t, db)
@@ -59,6 +66,8 @@ func TestSearchPageHandler_NoQuery_OK(t *testing.T) {
 	}
 }
 
+// When a query is provided, the search page handler should return HTTP 200
+// and render a response containing search results.
 func TestSearchPageHandler_WithQuery_OK(t *testing.T) {
 	db := setupTestHandlers(t)
 	defer closeDB(t, db)
