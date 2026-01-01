@@ -23,7 +23,7 @@ RUN apk add --no-cache ca-certificates curl
 # App binary
 COPY --from=build /app/app ./app
 
-# Kun de runtime-assets app'en faktisk læser fra disk
+# Only runtime assets that the app actually reads from disk
 COPY --from=build /app/templates ./templates
 COPY --from=build /app/static ./static
 COPY --from=build /app/migrations ./migrations
