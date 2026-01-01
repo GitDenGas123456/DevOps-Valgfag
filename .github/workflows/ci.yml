@@ -394,7 +394,3 @@ jobs:
             docker exec grafana sha256sum /var/lib/grafana/dashboards/search-monitoring-dashboard.json || true
 
             docker image prune -f
-
-
-
-
