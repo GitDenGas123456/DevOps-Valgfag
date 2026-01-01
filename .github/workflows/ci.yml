@@ -174,7 +174,7 @@ jobs:
   #
   # Purpose:
   # - Validates docker-compose wiring, env_file behavior, and container health checks
-  # - Uses an image tagged with the commited SHA for determinism
+  # - Uses an image tagged with the committed SHA for determinism
   # -------------------------
   compose-integration:
     needs: build
