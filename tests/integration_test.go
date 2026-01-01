@@ -67,12 +67,14 @@ func setupTestServer(t *testing.T) (*mux.Router, *sql.DB) {
 	r.HandleFunc("/about", h.AboutPageHandler).Methods(http.MethodGet)
 	r.HandleFunc("/login", h.LoginPageHandler).Methods(http.MethodGet)
 	r.HandleFunc("/register", h.RegisterPageHandler).Methods(http.MethodGet)
+	r.HandleFunc("/weather", h.WeatherPageHandler).Methods(http.MethodGet)
 
 	// API (auth + search)
 	r.HandleFunc("/api/login", h.APILoginHandler).Methods(http.MethodPost)
 	r.HandleFunc("/api/register", h.APIRegisterHandler).Methods(http.MethodPost)
 	r.HandleFunc("/api/logout", h.APILogoutHandler).Methods(http.MethodPost)
 	r.HandleFunc("/api/search", h.APISearchHandler).Methods(http.MethodGet)
+	r.HandleFunc("/api/weather", h.APIWeatherHandler).Methods(http.MethodGet)
 
 	// Ops endpoints
 	r.HandleFunc("/healthz", h.Healthz).Methods(http.MethodGet)
