@@ -179,6 +179,52 @@ body{
 .muted{color:var(--muted)}
 .img-responsive{max-width:100%; height:auto; border-radius:12px}
 
+/* ===== Quick links (About) ===== */
+.quick-links{
+  display:grid;
+  gap:12px;
+  margin-top:14px;
+}
+
+@media (min-width:720px){
+  .quick-links{
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.quick-link{
+  display:block;
+  text-decoration:none;
+  padding:16px;
+  border-radius:14px;
+  border:1px solid var(--hairline);
+  background: linear-gradient(180deg, #ffffff, #fbfbff);
+  box-shadow: 0 6px 18px rgba(28,38,72,.06);
+  transition: transform .05s ease, box-shadow .12s ease, border-color .12s ease;
+  color: var(--text);
+}
+
+.quick-link:hover{
+  border-color: rgba(91,124,250,.35);
+  box-shadow: 0 10px 24px rgba(28,38,72,.10);
+}
+
+.quick-link:active{
+  transform: translateY(1px);
+}
+
+.ql-title{
+  font-weight:800;
+  font-size:16px;
+  line-height:1.2;
+  color: var(--primary-600);
+}
+
+.ql-sub{
+  margin-top:6px;
+  font-size:14px;
+}
+
 /* Forms */
 .form{display:grid; gap:12px}
 .form label{display:grid; gap:6px}
