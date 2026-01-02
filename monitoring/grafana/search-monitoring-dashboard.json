@@ -31,7 +31,7 @@
       },
       "id": 11,
       "panels": [],
-      "title": "Platform & App Health",
+      "title": "Health",
       "type": "row"
     },
     {
@@ -96,7 +96,7 @@
           "refId": "A"
         }
       ],
-      "title": "Host CPU Utilization (5m avg)",
+      "title": "CPU usage (last 5m)",
       "type": "stat"
     },
     {
@@ -190,7 +190,7 @@
           "refId": "A"
         }
       ],
-      "title": "HTTP Request Rate by Route (RPS)",
+      "title": "Requests by path (all routes)",
       "type": "timeseries"
     },
     {
@@ -255,7 +255,7 @@
           "refId": "A"
         }
       ],
-      "title": "Host Memory Utilization",
+      "title": "Memory usage",
       "type": "stat"
     },
     {
@@ -363,7 +363,7 @@
           "refId": "A"
         }
       ],
-      "title": "Go GC Pause (ms)",
+      "title": "GC pause duration (ms)",
       "type": "timeseries"
     },
     {
@@ -475,7 +475,7 @@
           "refId": "A"
         }
       ],
-      "title": "HTTP Errors (non-2xx) / sec",
+      "title": "Error-rate",
       "type": "timeseries"
     },
     {
@@ -582,7 +582,7 @@
           "refId": "A"
         }
       ],
-      "title": "Go Goroutines",
+      "title": "Goroutines",
       "type": "timeseries"
     },
     {
@@ -595,7 +595,7 @@
       },
       "id": 12,
       "panels": [],
-      "title": "Search Latency & SLO",
+      "title": "Latency & SLA",
       "type": "row"
     },
     {
@@ -703,7 +703,7 @@
           "refId": "B"
         }
       ],
-      "title": "Search Latency (P50/P95, ms)",
+      "title": "Search latency (P50 / P95, ms)",
       "type": "stat"
     },
     {
@@ -811,7 +811,7 @@
           "refId": "A"
         }
       ],
-      "title": "Total HTTP Request Rate (RPS)",
+      "title": "Requests total",
       "type": "timeseries"
     },
     {
@@ -881,7 +881,7 @@
           "refId": "A"
         }
       ],
-      "title": "P95 Search Latency (ms)",
+      "title": "P95 latency (last 5m)",
       "type": "gauge"
     },
     {
@@ -1023,7 +1023,7 @@
               "refId": "A"
             }
           ],
-          "title": "Search/Auth Traffic (RPS) by Route",
+          "title": "Search & Login (requests by path)",
           "type": "timeseries"
         },
         {
@@ -1131,7 +1131,7 @@
               "refId": "A"
             }
           ],
-          "title": "Search Requests/sec",
+          "title": "Search throughput (requests/s)",
           "type": "timeseries"
         },
         {
@@ -1241,11 +1241,11 @@
               "refId": "A"
             }
           ],
-          "title": "Search Hit Rate (%)",
+          "title": "Hit-rate",
           "type": "timeseries"
         }
       ],
-      "title": "Key User Flows (Search & Auth)",
+      "title": "Search & Login",
       "type": "row"
     }
   ],
