@@ -390,7 +390,27 @@ jobs:
               exit 1
             fi
             
+            # --- Force dashboards to be file-provisioned (delete DB copies by UID) ---
+            echo "Deleting dashboards by UID (to avoid DB overriding provisioned files)..."
+            docker exec grafana sh -lc "
+              set -e
+              curl -sS -u \"${GF_SECURITY_ADMIN_USER}:${GF_SECURITY_ADMIN_PASSWORD}\" \
+                -X DELETE http://localhost:3000/api/dashboards/uid/whoknows-health >/dev/null || true
+              curl -sS -u \"${GF_SECURITY_ADMIN_USER}:${GF_SECURITY_ADMIN_PASSWORD}\" \
+                -X DELETE http://localhost:3000/api/dashboards/uid/postgres-metrics >/dev/null || true
+            "
+            
+            # Recreate grafana so provisioning re-imports JSON cleanly
+            docker compose up -d --force-recreate grafana
+            
+            # Wait again (new container)
+            echo "Waiting for Grafana container (after recreate)..."
+            for i in $(seq 1 30); do
+              if docker inspect -f '{{.State.Running}}' grafana 2>/dev/null | grep -q true; then
+                break
+              fi
+              sleep 2
+            done
+            
             echo "Dashboard file checksum inside Grafana container:"
             docker exec grafana sha256sum /var/lib/grafana/dashboards/search-monitoring-dashboard.json || true
-
-            docker image prune -f
