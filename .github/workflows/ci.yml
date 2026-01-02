@@ -359,64 +359,12 @@ jobs:
             APP_IMAGE_TAG=${APP_IMAGE_TAG}
             EOF
             chmod 600 .env
-
+            
             echo "Dashboard file checksum on VM:"
             sha256sum monitoring/grafana/search-monitoring-dashboard.json || true
-
+            
             docker compose pull
-
-            # Start everything EXCEPT grafana (avoid starting it twice)
-            NON_GRAFANA_SERVICES="$(docker compose config --services | grep -v '^grafana$' || true)"
-            if [ -n "$NON_GRAFANA_SERVICES" ]; then
-              docker compose up -d --remove-orphans $NON_GRAFANA_SERVICES
-            fi
-            
-            # Recreate grafana once so provisioning reloads dashboards from JSON
-            docker compose up -d --force-recreate grafana
-            
-            echo "Waiting for Grafana HTTP API..."
-            for i in $(seq 1 60); do
-              if docker exec grafana sh -lc 'curl -fsS http://127.0.0.1:3000/api/health >/dev/null'; then
-                echo "Grafana is healthy."
-                break
-              fi
-              sleep 2
-            done
-            
-            docker exec grafana sh -lc 'curl -fsS http://127.0.0.1:3000/api/health >/dev/null' || {
-              echo "ERROR: Grafana API not reachable" >&2
-              docker logs grafana || true
-              exit 1
-            }
-            
-            # --- Force dashboards to be file-provisioned (delete DB copies by UID) ---
-            echo "Deleting dashboards by UID (to avoid DB overriding provisioned files)..."
-            docker exec grafana sh -lc "
-              set -e
-              curl -sS -u \"${GF_SECURITY_ADMIN_USER}:${GF_SECURITY_ADMIN_PASSWORD}\" \
-                -X DELETE http://127.0.0.1:3000/api/dashboards/uid/whoknows-health >/dev/null || true
-              curl -sS -u \"${GF_SECURITY_ADMIN_USER}:${GF_SECURITY_ADMIN_PASSWORD}\" \
-                -X DELETE http://127.0.0.1:3000/api/dashboards/uid/postgres-metrics >/dev/null || true
-            "
-            
-            # Recreate grafana so provisioning re-imports JSON cleanly
-            docker compose up -d --force-recreate grafana
-            
-            # Wait again (new container) - IMPORTANT: wait for HTTP API, not just "Running"
-            echo "Waiting for Grafana HTTP API (after recreate)..."
-            for i in $(seq 1 60); do
-              if docker exec grafana sh -lc 'curl -fsS http://127.0.0.1:3000/api/health >/dev/null'; then
-                echo "Grafana is healthy (after recreate)."
-                break
-              fi
-              sleep 2
-            done
-            
-            docker exec grafana sh -lc 'curl -fsS http://127.0.0.1:3000/api/health >/dev/null' || {
-              echo "ERROR: Grafana API not reachable after recreate" >&2
-              docker logs grafana || true
-              exit 1
-            }
+            docker compose up -d --remove-orphans
             
             echo "Dashboard file checksum inside Grafana container:"
             docker exec grafana sha256sum /var/lib/grafana/dashboards/search-monitoring-dashboard.json || true
