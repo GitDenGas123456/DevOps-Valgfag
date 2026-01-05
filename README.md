@@ -1,4 +1,4 @@
-# WhoKnows (Go) - DevOps Valgfag Project:
+# WhoKnows (Go) - DevOps Valgfag Project::
 
 WhoKnows is a lightweight Go web application built for the DevOps Valgfag course. It demonstrates end-to-end DevOps practices with production parity, automation, and operational correctness.
 
